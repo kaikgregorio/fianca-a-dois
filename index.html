@@ -33,6 +33,33 @@
 }
 
 /* ============================================================
+   MODO NOITE
+   ============================================================ */
+[data-theme="dark"]{
+  --green-light:#163226;
+  --bg:#101418;
+  --white:#1A2027;
+  --amber-light:#3A2E12;
+  --red-light:#3B1E1A;
+  --text-1:#F1F3F5;
+  --text-2:#A5ADB8;
+  --text-3:#6C7683;
+  --border:#2A323C;
+  --shadow-sm:0 1px 3px rgba(0,0,0,.4);
+  --shadow-md:0 4px 14px rgba(0,0,0,.5);
+}
+[data-theme="dark"] .alert-amber{color:#FCD34D;border-color:#57431a;}
+[data-theme="dark"] .alert-red{color:#FCA5A5;border-color:#6b2320;}
+[data-theme="dark"] .alert-green{color:#6EE7B7;}
+[data-theme="dark"] .alert-blue{background:#0d2836;color:#7DD3FC;border-color:#164e63;}
+[data-theme="dark"] .tag-fixed{background:#2e2350;color:#C4B5FD;}
+[data-theme="dark"] .tag-variable{color:#FCD34D;}
+[data-theme="dark"] .tag-open{color:#FCD34D;}
+[data-theme="dark"] .toast{background:#2A323C;}
+.theme-btn{background:none;border:none;width:44px;height:44px;margin-left:auto;display:flex;align-items:center;justify-content:center;color:var(--text-2);}
+.theme-btn svg{width:20px;height:20px;stroke-width:2;}
+
+/* ============================================================
    RESET & BASE (mobile-first)
    ============================================================ */
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -282,6 +309,9 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
   </button>
   <div class="topbar-title">Financa a Dois</div>
+  <button class="theme-btn" onclick="toggleTheme()" aria-label="Alternar tema">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+  </button>
 </header>
 
 <div class="drawer-backdrop" id="drawerBackdrop" onclick="toggleDrawer(false)"></div>
@@ -322,6 +352,10 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
     <button class="nav-btn" data-view="settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06A1.65 1.65 0 0015 19.4a1.65 1.65 0 00-1.65 1.5V21a2 2 0 01-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06-.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.5-1.65H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001.65-1.5V3a2 2 0 014 0v.09A1.65 1.65 0 0016 4.6a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.5 1.65H21a2 2 0 010 4h-.09A1.65 1.65 0 0019.4 15z"/></svg>
       <span>Configuracoes</span>
+    </button>
+    <button class="nav-btn" onclick="toggleTheme()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+      <span id="themeLblSide">Modo noite</span>
     </button>
   </nav>
 </aside>
@@ -692,6 +726,26 @@ function toggleDrawer(open){
 }
 
 /* ============================================================
+   TEMA (modo dia / modo noite)
+   ============================================================ */
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim()||'#888'; }
+function applyTheme(){
+  const dark = CFG.theme==='dark';
+  document.documentElement.dataset.theme = dark?'dark':'light';
+  const lbl=document.getElementById('themeLblSide');
+  if(lbl) lbl.textContent = dark?'Modo dia':'Modo noite';
+  const meta=document.querySelector('meta[name="theme-color"]');
+  if(meta) meta.content = dark?'#101418':'#4CAF7D';
+}
+function toggleTheme(){
+  CFG.theme = CFG.theme==='dark'?'light':'dark';
+  svCfg();
+  applyTheme();
+  const act=document.querySelector('.view.active');
+  if(act && act.id==='view-reports') renderReports();
+}
+
+/* ============================================================
    SUPABASE - API REST (fetch puro, sem SDK)
    ============================================================ */
 function sbReady(){ return !!(CFG.sbUrl && CFG.sbKey); }
@@ -785,7 +839,7 @@ function go(view){
   window.scrollTo(0,0);
   renderView(view);
 }
-document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>go(b.dataset.view)));
+document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.view)));
 
 function render(){
   const v = document.querySelector('.view.active').id.replace('view-','');
@@ -969,6 +1023,22 @@ function closesTomorrow(card){
   const t=new Date(); t.setDate(t.getDate()+1);
   return t.getDate()===Number(card.close_day);
 }
+/* data de vencimento da fatura de um ciclo:
+   se o vencimento cai antes/no dia do fechamento, e no mes seguinte */
+function dueDateOf(card, ym){
+  let y=Math.floor(ym/12), m=ym%12;
+  if(Number(card.due_day) <= Number(card.close_day)){ m+=1; if(m>11){m=0;y+=1;} }
+  return new Date(y, m, Number(card.due_day));
+}
+function dueDateIso(card, ym){
+  const d=dueDateOf(card,ym);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function daysUntil(d){
+  const t=new Date(); t.setHours(0,0,0,0);
+  const x=new Date(d); x.setHours(0,0,0,0);
+  return Math.round((x-t)/86400000);
+}
 
 /* ============================================================
    DASHBOARD
@@ -1060,9 +1130,22 @@ function renderDash(){
     if(p>=80) return `<div class="alert alert-amber">${escHtml(c.name)}: ${p.toFixed(0)}% do limite estipulado — ${fmt(sp)} de ${fmt(c.limit)}.</div>`;
     return '';
   }).join('');
-  const cardAlerts=S.cards.filter(closesTomorrow).map(c=>{
-    const val=invoiceValue(c,currentOpenYm(c));
-    return `<div class="alert alert-blue">Fatura do cartao ${escHtml(c.name)} fecha amanha (dia ${c.close_day}) — valor atual ${fmt(val)}. Compras depois do fechamento entram na proxima fatura.</div>`;
+  const cardAlerts=S.cards.map(c=>{
+    let out='';
+    if(closesTomorrow(c)){
+      const v=invoiceValue(c,currentOpenYm(c));
+      out+=`<div class="alert alert-blue">Fatura do cartao ${escHtml(c.name)} fecha amanha (dia ${c.close_day}) — valor atual ${fmt(v)}. Compras depois do fechamento entram na proxima fatura.</div>`;
+    }
+    const ymClosed=currentOpenYm(c)-1;
+    const val=invoiceValue(c,ymClosed);
+    if(val>0.005 && !isPaid(c.id,ymClosed)){
+      const du=daysUntil(dueDateOf(c,ymClosed));
+      if(du===2) out+=`<div class="alert alert-amber">Fatura do ${escHtml(c.name)} (${fmt(val)}) vence em 2 dias, ${fmtDate(dueDateIso(c,ymClosed))}.</div>`;
+      else if(du===1) out+=`<div class="alert alert-red">Fatura do ${escHtml(c.name)} (${fmt(val)}) vence amanha! Nao esqueca de pagar.</div>`;
+      else if(du===0) out+=`<div class="alert alert-red">Fatura do ${escHtml(c.name)} (${fmt(val)}) vence hoje!</div>`;
+      else if(du<0) out+=`<div class="alert alert-red">Fatura do ${escHtml(c.name)} (${fmt(val)}) esta vencida desde ${fmtDate(dueDateIso(c,ymClosed))}. Apos pagar, marque como paga na aba Cartoes.</div>`;
+    }
+    return out;
   }).join('');
   document.getElementById('alertsBox').innerHTML=cardAlerts+catAlerts;
 }
@@ -1211,16 +1294,17 @@ function renderCards(){
             <div class="cc-info">
               Fechamento dia ${c.close_day} · Vencimento dia ${c.due_day} · Melhor dia de compra: dia ${bestBuyDay(c)}
             </div>
-            ${closedVal>0.005?`
             <div class="cc-invoice">
               <div>
-                <div class="cc-inv-label">Fatura fechada (${ymLabel(ymClosed)}) · vence dia ${c.due_day}</div>
+                <div class="cc-inv-label">Fatura fechada (${ymLabel(ymClosed)}) · vence ${fmtDate(dueDateIso(c,ymClosed))}</div>
                 <div class="cc-inv-val">${fmt(closedVal)}</div>
               </div>
               ${closedPaid
                 ?'<span class="tag tag-paid">Paga</span>'
-                :`<button class="btn btn-primary btn-sm" onclick="payInvoice('${c.id}',${ymClosed})">Marcar como paga</button>`}
-            </div>`:''}
+                :closedVal>0.005
+                  ?`<button class="btn btn-primary btn-sm" onclick="payInvoice('${c.id}',${ymClosed})">Marcar como paga</button>`
+                  :'<span class="tag tag-paid" style="opacity:.65;">Sem valores</span>'}
+            </div>
             <div class="cc-invoice">
               <div>
                 <div class="cc-inv-label">Fatura atual (${ymLabel(ymOpen)}) · fecha dia ${c.close_day}</div>
@@ -1332,10 +1416,22 @@ async function delCcTx(id){
 
 async function payInvoice(cardId, ym){
   if(!canWrite()) return;
-  if(!confirm('Marcar esta fatura como paga?'))return;
+  const card=S.cards.find(c=>c.id===cardId); if(!card) return;
+  const val=invoiceValue(card, ym);
+  if(!confirm(`Marcar a fatura de ${fmt(val)} como paga? O valor sera lancado como gasto e deduzido do saldo do mes.`))return;
   try{
+    const catFix=S.cats.find(c=>c.name.toLowerCase()==='contas fixas');
     await sb('card_payments',{method:'POST',body:JSON.stringify({card_id:cardId, mes:ymKey(ym)})});
-    toast('Fatura marcada como paga!','ok');
+    await sb('transactions',{method:'POST',body:JSON.stringify({
+      descricao:`Fatura ${card.name} (${ymLabel(ym)})`,
+      valor:val,
+      cat_id:catFix?catFix.id:null,
+      sub:'',
+      pessoa:'both',
+      tipo:'fixed',
+      data:today()
+    })});
+    toast('Fatura paga! Valor deduzido do saldo do mes.','ok');
     await loadAll(true);
   }catch(e){ console.error(e); toast('Erro ao gravar. Tente novamente.','err'); }
 }
@@ -1438,7 +1534,7 @@ function drawPie(txs){
   const total=data.reduce((s,d)=>s+d.total,0);
 
   if(total===0){
-    ctx.fillStyle='#9CA3AF'; ctx.font='13px Inter,sans-serif'; ctx.textAlign='center';
+    ctx.fillStyle=cssVar('--text-3'); ctx.font='13px Inter,sans-serif'; ctx.textAlign='center';
     ctx.fillText('Sem gastos neste mes',W/2,H/2); return;
   }
 
@@ -1448,12 +1544,12 @@ function drawPie(txs){
     const sl=(d.total/total)*Math.PI*2;
     ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,ang,ang+sl); ctx.closePath();
     ctx.fillStyle=d.color; ctx.fill();
-    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+    ctx.strokeStyle=cssVar('--white'); ctx.lineWidth=2; ctx.stroke();
     ang+=sl;
   });
   ctx.beginPath(); ctx.arc(cx,cy,r*.55,0,Math.PI*2);
-  ctx.fillStyle='#fff'; ctx.fill();
-  ctx.fillStyle='#1A1F2E'; ctx.font='bold 13px Inter,sans-serif'; ctx.textAlign='center';
+  ctx.fillStyle=cssVar('--white'); ctx.fill();
+  ctx.fillStyle=cssVar('--text-1'); ctx.font='bold 13px Inter,sans-serif'; ctx.textAlign='center';
   ctx.fillText(fmt(total),cx,cy+5);
 
   document.getElementById('pieLegend').innerHTML=data.slice(0,6).map(d=>`
@@ -1485,18 +1581,18 @@ function drawLine(){
   const pad={t:14,r:12,b:32,l:52};
   const cW=W-pad.l-pad.r, cH=H-pad.t-pad.b;
 
-  ctx.strokeStyle='#E5E7EB'; ctx.lineWidth=.7;
+  ctx.strokeStyle=cssVar('--border'); ctx.lineWidth=.7;
   for(let i=0;i<=4;i++){
     const y=pad.t+(cH/4)*i;
     ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(W-pad.r,y); ctx.stroke();
     const v=maxV-(maxV/4)*i;
-    ctx.fillStyle='#9CA3AF'; ctx.font='9px Inter,sans-serif'; ctx.textAlign='right';
+    ctx.fillStyle=cssVar('--text-3'); ctx.font='9px Inter,sans-serif'; ctx.textAlign='right';
     ctx.fillText(fmt(v).replace('R$\u00a0','R$').slice(0,7),pad.l-4,y+3);
   }
   const mnames=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   months.forEach((mk,i)=>{
     const x=pad.l+(i/(months.length-1))*cW;
-    ctx.fillStyle='#9CA3AF'; ctx.font='9px Inter,sans-serif'; ctx.textAlign='center';
+    ctx.fillStyle=cssVar('--text-3'); ctx.font='9px Inter,sans-serif'; ctx.textAlign='center';
     ctx.fillText(mnames[parseInt(mk.split('-')[1])-1],x,H-pad.b+14);
   });
 
@@ -1510,7 +1606,7 @@ function drawLine(){
     data.forEach((v,i)=>{
       const x=pad.l+(i/(data.length-1))*cW, y=pad.t+cH-(v/maxV)*cH;
       ctx.beginPath(); ctx.arc(x,y,3.5,0,Math.PI*2);
-      ctx.fillStyle=color; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+      ctx.fillStyle=color; ctx.fill(); ctx.strokeStyle=cssVar('--white'); ctx.lineWidth=1.5; ctx.stroke();
     });
   }
   line(revenues,'#4CAF7D');
@@ -1608,6 +1704,7 @@ function populatePersonSelect(selId, withBoth=true){
    INICIALIZACAO
    ============================================================ */
 async function init(){
+  applyTheme();
   if(!sbReady()){
     setBanner('setup');
     setTimeout(()=>toast('Bem-vindos! Configure o Supabase em Configuracoes para comecar.','warn'),700);
