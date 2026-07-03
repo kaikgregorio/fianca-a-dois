@@ -341,6 +341,18 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
       <span>Cartoes</span>
     </button>
+    <button class="nav-btn" data-view="goals">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+      <span>Metas</span>
+    </button>
+    <button class="nav-btn" data-view="debts">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
+      <span>Dividas</span>
+    </button>
+    <button class="nav-btn" data-view="wishes">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+      <span>Desejos</span>
+    </button>
     <button class="nav-btn" data-view="categories">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
       <span>Categorias</span>
@@ -427,6 +439,34 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
       <button class="btn btn-primary btn-sm" onclick="openCardModal()">+ Novo cartao</button>
     </div>
     <div id="ccList"></div>
+  </div>
+
+  <!-- METAS DE POUPANCA -->
+  <div class="view" id="view-goals">
+    <div class="header-row">
+      <div><div class="page-title">Metas de poupanca</div><div class="page-sub">objetivos de economia do casal</div></div>
+      <button class="btn btn-primary btn-sm" onclick="openGoalModal()">+ Nova meta</button>
+    </div>
+    <div id="goalList"></div>
+  </div>
+
+  <!-- DIVIDAS -->
+  <div class="view" id="view-debts">
+    <div class="header-row">
+      <div><div class="page-title">Dividas</div><div class="page-sub">controle das dividas do casal</div></div>
+      <button class="btn btn-primary btn-sm" onclick="openDebtModal()">+ Nova divida</button>
+    </div>
+    <div class="g4" id="debtSummary" style="grid-template-columns:1fr 1fr;"></div>
+    <div id="debtList"></div>
+  </div>
+
+  <!-- DESEJOS / LISTA DE COMPRAS -->
+  <div class="view" id="view-wishes">
+    <div class="header-row">
+      <div><div class="page-title">Desejos e compras</div><div class="page-sub">o que o casal quer ou precisa comprar</div></div>
+      <button class="btn btn-primary btn-sm" onclick="openWishModal()">+ Novo item</button>
+    </div>
+    <div id="wishList"></div>
   </div>
 
   <!-- CATEGORIAS -->
@@ -689,6 +729,105 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
   </div>
 </div>
 
+<!-- ============================================================
+     MODAL: META DE POUPANCA
+     ============================================================ -->
+<div class="overlay" id="modalGoal" style="display:none;">
+  <div class="modal">
+    <div class="modal-grip"></div>
+    <div class="modal-title" id="mGoalTitle">Nova meta</div>
+    <input type="hidden" id="mGoalId">
+    <div class="fg"><label>Nome da meta</label><input type="text" id="mGoalName" placeholder="Ex: Viagem, Carro, Reserva de emergencia"></div>
+    <div class="frow">
+      <div class="fg"><label>Valor total (R$)</label><input type="number" id="mGoalTotal" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
+      <div class="fg"><label>Ja guardado (R$)</label><input type="number" id="mGoalAtual" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
+    </div>
+    <div class="fg"><label>Data limite</label><input type="date" id="mGoalDate"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeM('modalGoal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveGoal()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     MODAL: DEPOSITO NA META
+     ============================================================ -->
+<div class="overlay" id="modalDeposit" style="display:none;">
+  <div class="modal">
+    <div class="modal-grip"></div>
+    <div class="modal-title" id="mDepTitle">Adicionar deposito</div>
+    <input type="hidden" id="mDepGoalId">
+    <div class="fg"><label>Valor do deposito (R$)</label><input type="number" id="mDepVal" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeM('modalDeposit')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveDeposit()">Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     MODAL: DIVIDA
+     ============================================================ -->
+<div class="overlay" id="modalDebt" style="display:none;">
+  <div class="modal">
+    <div class="modal-grip"></div>
+    <div class="modal-title" id="mDebtTitle">Nova divida</div>
+    <input type="hidden" id="mDebtId">
+    <div class="fg"><label>Descricao</label><input type="text" id="mDebtDesc" placeholder="Ex: Financiamento carro, Emprestimo pessoal"></div>
+    <div class="frow">
+      <div class="fg"><label>Valor total da divida (R$)</label><input type="number" id="mDebtTotal" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
+      <div class="fg"><label>Valor ja pago (R$)</label><input type="number" id="mDebtPago" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Parcelas restantes</label><input type="number" id="mDebtParcRest" placeholder="Ex: 24" min="0" inputmode="numeric"></div>
+      <div class="fg"><label>Valor da parcela (R$)</label><input type="number" id="mDebtParcVal" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Taxa de juros (opcional)</label><input type="text" id="mDebtJuros" placeholder="Ex: 1,5% a.m."></div>
+      <div class="fg"><label>Dia do vencimento mensal</label><input type="number" id="mDebtDia" placeholder="Ex: 10" min="1" max="31" inputmode="numeric"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeM('modalDebt')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveDebt()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     MODAL: DESEJO / ITEM DE COMPRA
+     ============================================================ -->
+<div class="overlay" id="modalWish" style="display:none;">
+  <div class="modal">
+    <div class="modal-grip"></div>
+    <div class="modal-title" id="mWishTitle">Novo item</div>
+    <input type="hidden" id="mWishId">
+    <div class="fg"><label>Descricao</label><input type="text" id="mWishDesc" placeholder="Ex: Pneu pro carro, Celular novo, Show"></div>
+    <div class="frow">
+      <div class="fg"><label>Valor estimado (R$)</label><input type="number" id="mWishVal" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
+      <div class="fg"><label>Prioridade</label>
+        <select id="mWishPrio">
+          <option value="necessidade">Necessidade</option>
+          <option value="desejo" selected>Desejo</option>
+          <option value="espera">Pode esperar</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg"><label>Como pretende pagar</label>
+      <select id="mWishPag">
+        <option value="avista">A vista</option>
+        <option value="parcelado">Parcelado</option>
+        <option value="juntar">Juntar antes de comprar</option>
+      </select>
+    </div>
+    <div class="alert alert-green" style="font-size:11px;">Ao salvar, a IA analisa a situacao financeira do casal e da um parecer sobre a compra.</div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeM('modalWish')">Cancelar</button>
+      <button class="btn btn-primary" id="btnWishSave" onclick="saveWish()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-wrap" id="toasts"></div>
 
 <script>
@@ -703,6 +842,7 @@ let CFG = Object.assign({ sbUrl:'', sbKey:'', apiKey:'' }, ldCfg());
 let S = {
   tx: [], rev: [], cats: [],
   cards: [], cardTx: [], cardPay: [],
+  goals: [], debts: [], wishes: [],
   names: ['Parceiro 1','Parceiro 2'],
   online: true, configured: false
 };
@@ -791,14 +931,17 @@ async function sb(path, opts={}){
 async function loadAll(silent=false){
   if(!sbReady()){ setBanner('setup'); render(); return; }
   try{
-    const [cats, tx, rev, cfg, cards, cardTx, cardPay] = await Promise.all([
+    const [cats, tx, rev, cfg, cards, cardTx, cardPay, goals, debts, wishes] = await Promise.all([
       sb('categories?select=*&order=created_at.asc'),
       sb('transactions?select=*&order=data.desc,created_at.desc&limit=500'),
       sb('revenues?select=*&order=created_at.asc'),
       sb('couple_settings?select=*&id=eq.1'),
       sb('cards?select=*&order=created_at.asc'),
       sb('card_transactions?select=*&order=data.desc,created_at.desc&limit=500'),
-      sb('card_payments?select=*')
+      sb('card_payments?select=*'),
+      sb('goals?select=*&order=data_limite.asc'),
+      sb('debts?select=*&order=created_at.asc'),
+      sb('wishes?select=*&order=created_at.desc')
     ]);
     S.cats = (cats||[]).map(c=>({...c, subs:Array.isArray(c.subs)?c.subs:[], limit:Number(c.limit_value)||0}));
     S.tx = tx||[];
@@ -806,6 +949,9 @@ async function loadAll(silent=false){
     S.cards = cards||[];
     S.cardTx = cardTx||[];
     S.cardPay = cardPay||[];
+    S.goals = goals||[];
+    S.debts = debts||[];
+    S.wishes = wishes||[];
     if(cfg && cfg[0]) S.names = [cfg[0].partner1, cfg[0].partner2];
     S.online = true; S.configured = true;
     setBanner('');
@@ -868,6 +1014,9 @@ function renderView(v){
   if(v==='transactions') renderTx();
   if(v==='revenues') renderRevs();
   if(v==='cards') renderCards();
+  if(v==='goals') renderGoals();
+  if(v==='debts') renderDebts();
+  if(v==='wishes') renderWishes();
   if(v==='categories') renderCats();
   if(v==='reports') setTimeout(renderReports, 40);
   if(v==='settings') renderSettings();
@@ -1553,6 +1702,356 @@ async function payInvoice(cardId, ym){
     toast('Fatura paga! Valor deduzido do saldo do mes.','ok');
     await loadAll(true);
   }catch(e){ console.error(e); toast('Erro ao gravar. Tente novamente.','err'); }
+}
+
+/* ============================================================
+   METAS DE POUPANCA
+   ============================================================ */
+function monthsUntil(iso){
+  const [y,m]=String(iso).split('-').map(Number);
+  const t=new Date();
+  return Math.max((y-t.getFullYear())*12 + (m-1-t.getMonth()), 1);
+}
+
+function renderGoals(){
+  document.getElementById('goalList').innerHTML = S.goals.length===0
+    ? '<div class="empty">Nenhuma meta cadastrada. Toque em "+ Nova meta" para criar a primeira.</div>'
+    : S.goals.map(g=>{
+        const total=Number(g.valor_total), atual=Number(g.valor_atual);
+        const pct=total>0?Math.min(100,(atual/total)*100):0;
+        const falta=Math.max(total-atual,0);
+        const meses=monthsUntil(g.data_limite);
+        const porMes=falta/meses;
+        const done=falta<=0.005;
+        return `<div class="card" style="margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+            <div style="min-width:0;">
+              <div style="font-size:14px;font-weight:700;">${escHtml(g.nome)}</div>
+              <div style="font-size:11px;color:var(--text-3);margin-top:2px;">ate ${fmtDate(g.data_limite)} · ${meses} ${meses>1?'meses':'mes'} restante${meses>1?'s':''}</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-shrink:0;">
+              <button class="btn btn-primary btn-sm" onclick="openDepositModal('${g.id}')">+ Deposito</button>
+              <button class="btn btn-secondary btn-sm" onclick="openGoalModal('${g.id}')">Editar</button>
+              <button class="btn btn-secondary btn-sm" onclick="delGoal('${g.id}')">&#10005;</button>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin:12px 0 4px;gap:8px;">
+            <span style="font-weight:600;">${fmt(atual)} de ${fmt(total)}</span>
+            <span style="color:var(--text-2);">${pct.toFixed(0)}%</span>
+          </div>
+          <div class="prog-track" style="height:9px;"><div class="prog-fill" style="width:${pct.toFixed(0)}%;background:${done?'var(--green)':pct>=50?'var(--green)':'#3B82F6'};"></div></div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:9px;">
+            ${done
+              ? 'Meta atingida! Parabens!'
+              : `Para chegar la, guardem <b>${fmt(porMes)}/mes</b> — faltam ${fmt(falta)}.`}
+          </div>
+        </div>`;
+      }).join('');
+}
+
+function openGoalModal(id){
+  const g = id ? S.goals.find(x=>x.id===id) : null;
+  document.getElementById('mGoalTitle').textContent = g ? 'Editar meta' : 'Nova meta';
+  document.getElementById('mGoalId').value = g ? g.id : '';
+  document.getElementById('mGoalName').value = g ? g.nome : '';
+  document.getElementById('mGoalTotal').value = g ? g.valor_total : '';
+  document.getElementById('mGoalAtual').value = g ? g.valor_atual : '';
+  document.getElementById('mGoalDate').value = g ? g.data_limite : '';
+  openM('modalGoal');
+}
+
+async function saveGoal(){
+  if(!canWrite()) return;
+  const id=document.getElementById('mGoalId').value;
+  const nome=document.getElementById('mGoalName').value.trim();
+  const total=parseFloat(document.getElementById('mGoalTotal').value)||0;
+  const dataLim=document.getElementById('mGoalDate').value;
+  if(!nome||!total||!dataLim){toast('Preencha nome, valor total e data limite','err');return;}
+  const body={
+    nome, valor_total:total,
+    valor_atual:parseFloat(document.getElementById('mGoalAtual').value)||0,
+    data_limite:dataLim
+  };
+  try{
+    if(id) await sb(`goals?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(body)});
+    else await sb('goals',{method:'POST',body:JSON.stringify(body)});
+    closeM('modalGoal'); toast(id?'Meta atualizada!':'Meta criada!','ok');
+    await loadAll(true);
+  }catch(e){ console.error(e); toast('Erro ao gravar. Tente novamente.','err'); }
+}
+
+async function delGoal(id){
+  if(!canWrite()) return;
+  if(!confirm('Remover esta meta?'))return;
+  try{
+    await sb(`goals?id=eq.${id}`,{method:'DELETE'});
+    await loadAll(true);
+  }catch(e){ console.error(e); toast('Erro ao remover. Tente novamente.','err'); }
+}
+
+function openDepositModal(goalId){
+  const g=S.goals.find(x=>x.id===goalId); if(!g)return;
+  document.getElementById('mDepTitle').textContent=`Deposito em "${g.nome}"`;
+  document.getElementById('mDepGoalId').value=goalId;
+  document.getElementById('mDepVal').value='';
+  openM('modalDeposit');
+}
+
+async function saveDeposit(){
+  if(!canWrite()) return;
+  const id=document.getElementById('mDepGoalId').value;
+  const val=parseFloat(document.getElementById('mDepVal').value)||0;
+  if(!val){toast('Informe o valor','err');return;}
+  const g=S.goals.find(x=>x.id===id); if(!g)return;
+  try{
+    await sb(`goals?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({valor_atual:Number(g.valor_atual)+val})});
+    closeM('modalDeposit'); toast('Deposito registrado!','ok');
+    await loadAll(true);
+  }catch(e){ console.error(e); toast('Erro ao gravar. Tente novamente.','err'); }
+}
+
+/* ============================================================
+   DIVIDAS
+   ============================================================ */
+function renderDebts(){
+  const ativas=S.debts.filter(d=>Number(d.parcelas_restantes)>0 || (Number(d.valor_total)-Number(d.valor_pago))>0.005);
+  const totalDevido=ativas.reduce((s,d)=>s+Math.max(Number(d.valor_total)-Number(d.valor_pago),0),0);
+  const mensal=S.debts.filter(d=>Number(d.parcelas_restantes)>0).reduce((s,d)=>s+Number(d.valor_parcela),0);
+  document.getElementById('debtSummary').innerHTML=`
+    <div class="stat-card"><div class="stat-label">Total devido</div><div class="stat-val red">${fmt(totalDevido)}</div><div class="stat-note">${ativas.length} divida${ativas.length!==1?'s':''} ativa${ativas.length!==1?'s':''}</div></div>
+    <div class="stat-card"><div class="stat-label">Comprometido por mes</div><div class="stat-val">${fmt(mensal)}</div><div class="stat-note">soma das parcelas mensais</div></div>`;
+
+  document.getElementById('debtList').innerHTML = S.debts.length===0
+    ? '<div class="empty">Nenhuma divida cadastrada. Que continue assim! Se tiver alguma, toque em "+ Nova divida".</div>'
+    : S.debts.map(d=>{
+        const total=Number(d.valor_total), pago=Number(d.valor_pago);
+        const pct=total>0?Math.min(100,(pago/total)*100):0;
+        const rest=Number(d.parcelas_restantes);
+        const quitada=rest<=0 && (total-pago)<=0.005;
+        return `<div class="card" style="margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+            <div style="min-width:0;">
+              <div style="font-size:14px;font-weight:700;">${escHtml(d.descricao)} ${quitada?'<span class="tag tag-paid">Quitada</span>':''}</div>
+              <div style="font-size:11px;color:var(--text-3);margin-top:2px;">
+                ${rest>0?`${rest} parcela${rest>1?'s':''} de ${fmt(d.valor_parcela)} · vence dia ${d.dia_vencimento}`:'sem parcelas restantes'}
+                ${d.juros?` · juros ${escHtml(d.juros)}`:''}
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;flex-shrink:0;">
+              ${rest>0?`<button class="btn btn-primary btn-sm" onclick="payDebtInstallment('${d.id}')">Paguei 1 parcela</button>`:''}
+              <button class="btn btn-secondary btn-sm" onclick="openDebtModal('${d.id}')">Editar</button>
+              <button class="btn btn-secondary btn-sm" onclick="delDebt('${d.id}')">&#10005;</button>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin:12px 0 4px;gap:8px;">
+            <span style="font-weight:600;">${fmt(pago)} pagos de ${fmt(total)}</span>
+            <span style="color:var(--text-2);">${pct.toFixed(0)}%</span>
+          </div>
+          <div class="prog-track" style="height:9px;"><div class="prog-fill" style="width:${pct.toFixed(0)}%;background:${quitada?'var(--green)':'var(--amber)'};"></div></div>
+        </div>`;
+      }).join('');
+}
+
+function openDebtModal(id){
+  const d = id ? S.debts.find(x=>x.id===id) : null;
+  document.getElementById('mDebtTitle').textContent = d ? 'Editar divida' : 'Nova divida';
+  document.getElementById('mDebtId').value = d ? d.id : '';
+  document.getElementById('mDebtDesc').value = d ? d.descricao : '';
+  document.getElementById('mDebtTotal').value = d ? d.valor_total : '';
+  document.getElementById('mDebtPago').value = d ? d.valor_pago : '';
+  document.getElementById('mDebtParcRest').value = d ? d.parcelas_restantes : '';
+  document.getElementById('mDebtParcVal').value = d ? d.valor_parcela : '';
+  document.getElementById('mDebtJuros').value = d ? (d.juros||'') : '';
+  document.getElementById('mDebtDia').value = d ? d.dia_vencimento : '';
+  openM('modalDebt');
+}
+
+async function saveDebt(){
+  if(!canWrite()) return;
+  const id=document.getElementById('mDebtId').value;
+  const desc=document.getElementById('mDebtDesc').value.trim();
+  const total=parseFloat(document.getElementById('mDebtTotal').value)||0;
+  if(!desc||!total){toast('Preencha descricao e valor total','err');return;}
+  const body={
+    descricao:desc, valor_total:total,
+    valor_pago:parseFloat(document.getElementById('mDebtPago').value)||0,
+    parcelas_restantes:parseInt(document.getElementById('mDebtParcRest').value)||0,
+    valor_parcela:parseFloat(document.getElementById('mDebtParcVal').value)||0,
+    juros:document.getElementById('mDebtJuros').value.trim(),
+    dia_vencimento:parseInt(document.getElementById('mDebtDia').value)||10
+  };
+  try{
+    if(id) await sb(`debts?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(body)});
+    else await sb('debts',{method:'POST',body:JSON.stringify(body)});
+    closeM('modalDebt'); toast(id?'Divida atualizada!':'Divida registrada!','ok');
+    await loadAll(true);
+  }catch(e){ console.error(e); toast('Erro ao gravar. Tente novamente.','err'); }
+}
+
+async function payDebtInstallment(id){
+  if(!canWrite()) return;
+  const d=S.debts.find(x=>x.id===id); if(!d)return;
+  const val=Number(d.valor_parcela);
+  if(!confirm(`Registrar pagamento de 1 parcela de ${fmt(val)} da divida "${d.descricao}"?`))return;
+  try{
+    await sb(`debts?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({
+      valor_pago:Number(d.valor_pago)+val,
+      parcelas_restantes:Math.max(Number(d.parcelas_restantes)-1,0)
+    })});
+    toast('Parcela registrada!','ok');
+    await loadAll(true);
+  }catch(e){ console.error(e); toast('Erro ao gravar. Tente novamente.','err'); }
+}
+
+async function delDebt(id){
+  if(!canWrite()) return;
+  if(!confirm('Remover esta divida?'))return;
+  try{
+    await sb(`debts?id=eq.${id}`,{method:'DELETE'});
+    await loadAll(true);
+  }catch(e){ console.error(e); toast('Erro ao remover. Tente novamente.','err'); }
+}
+
+/* ============================================================
+   DESEJOS / LISTA DE COMPRAS (com parecer da IA)
+   ============================================================ */
+const PRIO={necessidade:{lbl:'Necessidade',bg:'var(--red-light)',fg:'#991B1B'},desejo:{lbl:'Desejo',bg:'var(--amber-light)',fg:'#92400E'},espera:{lbl:'Pode esperar',bg:'var(--border)',fg:'var(--text-2)'}};
+const PAG={avista:'a vista',parcelado:'parcelado',juntar:'juntar antes'};
+
+function finSnapshot(){
+  const mk=monthKey();
+  const mTx=S.tx.filter(t=>inMonth(t.data,mk));
+  const totExp=mTx.reduce((s,t)=>s+Number(t.valor),0);
+  const mRev=S.rev.filter(r=>r.recorrencia!=='once'||inMonth(r.data,mk));
+  const totRev=mRev.reduce((s,r)=>{const v=Number(r.valor);if(r.recorrencia==='biweekly')return s+v*2;if(r.recorrencia==='weekly')return s+v*4.3;return s+v;},0);
+  const credito=mTx.filter(t=>t.metodo==='credit').reduce((s,t)=>s+Number(t.valor),0);
+  const faturas=S.cards.map(c=>({cartao:c.name, fatura_aberta:+invoiceValue(c,currentOpenYm(c)).toFixed(2)}));
+  const dividasMensal=S.debts.filter(d=>Number(d.parcelas_restantes)>0).reduce((s,d)=>s+Number(d.valor_parcela),0);
+  const metas=S.goals.map(g=>({meta:g.nome, falta:+Math.max(Number(g.valor_total)-Number(g.valor_atual),0).toFixed(2)}));
+  return JSON.stringify({
+    mes:mk,
+    receitas_mes:+totRev.toFixed(2),
+    gastos_mes:+totExp.toFixed(2),
+    saldo_mes:+(totRev-totExp).toFixed(2),
+    gastos_no_credito:+credito.toFixed(2),
+    faturas_cartoes:faturas,
+    parcela_mensal_dividas:+dividasMensal.toFixed(2),
+    dividas_ativas:S.debts.filter(d=>Number(d.parcelas_restantes)>0).length,
+    metas_poupanca:metas
+  });
+}
+
+async function analyzeWish(w){
+  const r = await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true',
+      'x-api-key': CFG.apiKey
+    },
+    body: JSON.stringify({
+      model:'claude-haiku-4-5-20251001',
+      max_tokens:300,
+      system:'Voce e um assessor financeiro pratico de um casal. Responda em portugues brasileiro, em no maximo 4 frases curtas, sem markdown. Avalie se e saudavel comprar o item agora considerando a situacao financeira, e recomende a melhor forma de pagar (a vista, parcelado ou juntar antes). Seja direto, honesto e acolhedor.',
+      messages:[{role:'user',content:`Situacao financeira do casal: ${finSnapshot()}\n\nItem desejado: ${w.descricao} — valor estimado ${fmt(w.valor)} — prioridade: ${PRIO[w.prioridade]?.lbl||w.prioridade} — pretendem pagar: ${PAG[w.pagamento]||w.pagamento}.\n\nDe seu parecer curto.`}]
+    })
+  });
+  const data = await r.json();
+  if(data.error) throw new Error(data.error.message||'api error');
+  return (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join(' ').trim();
+}
+
+function renderWishes(){
+  document.getElementById('wishList').innerHTML = S.wishes.length===0
+    ? '<div class="empty">Nenhum item na lista. Toque em "+ Novo item" para adicionar.</div>'
+    : S.wishes.map(w=>{
+        const p=PRIO[w.prioridade]||PRIO.desejo;
+        return `<div class="card" style="margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+            <div style="min-width:0;">
+              <div style="font-size:14px;font-weight:700;">${escHtml(w.descricao)}</div>
+              <div style="font-size:11px;color:var(--text-3);margin-top:3px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                <span class="tag" style="background:${p.bg};color:${p.fg};">${p.lbl}</span>
+                <span>${fmt(w.valor)}</span> · <span>pagar ${PAG[w.pagamento]||w.pagamento}</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;flex-shrink:0;">
+              <button class="btn btn-secondary btn-sm" onclick="regenWish('${w.id}')">Reanalisar</button>
+              <button class="btn btn-secondary btn-sm" onclick="openWishModal('${w.id}')">Editar</button>
+              <button class="btn btn-secondary btn-sm" onclick="delWish('${w.id}')">&#10005;</button>
+            </div>
+          </div>
+          ${w.analise
+            ?`<div class="alert alert-green" style="margin-top:11px;margin-bottom:0;">Parecer da IA: ${escHtml(w.analise)}</div>`
+            :`<div style="font-size:11px;color:var(--text-3);margin-top:10px;">Sem parecer da IA ainda — toque em Reanalisar.</div>`}
+        </div>`;
+      }).join('');
+}
+
+function openWishModal(id){
+  const w = id ? S.wishes.find(x=>x.id===id) : null;
+  document.getElementById('mWishTitle').textContent = w ? 'Editar item' : 'Novo item';
+  document.getElementById('mWishId').value = w ? w.id : '';
+  document.getElementById('mWishDesc').value = w ? w.descricao : '';
+  document.getElementById('mWishVal').value = w ? w.valor : '';
+  document.getElementById('mWishPrio').value = w ? w.prioridade : 'desejo';
+  document.getElementById('mWishPag').value = w ? w.pagamento : 'avista';
+  openM('modalWish');
+}
+
+async function saveWish(){
+  if(!canWrite()) return;
+  const id=document.getElementById('mWishId').value;
+  const desc=document.getElementById('mWishDesc').value.trim();
+  const val=parseFloat(document.getElementById('mWishVal').value)||0;
+  if(!desc){toast('Preencha a descricao','err');return;}
+  const body={
+    descricao:desc, valor:val,
+    prioridade:document.getElementById('mWishPrio').value,
+    pagamento:document.getElementById('mWishPag').value
+  };
+  const btn=document.getElementById('btnWishSave');
+  btn.disabled=true;
+  try{
+    let saved;
+    if(id){ const r=await sb(`wishes?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(body)}); saved=r&&r[0]; }
+    else { const r=await sb('wishes',{method:'POST',body:JSON.stringify(body)}); saved=r&&r[0]; }
+    closeM('modalWish');
+    toast(id?'Item atualizado!':'Item adicionado!','ok');
+    await loadAll(true);
+    if(saved && CFG.apiKey){
+      toast('Gerando parecer da IA...','');
+      try{
+        const analise=await analyzeWish(saved);
+        await sb(`wishes?id=eq.${saved.id}`,{method:'PATCH',body:JSON.stringify({analise})});
+        await loadAll(true);
+      }catch(e){ console.error(e); toast('Nao consegui gerar o parecer agora. Use o botao Reanalisar.','warn'); }
+    }
+  }catch(e){ console.error(e); toast('Erro ao gravar. Tente novamente.','err'); }
+  finally{ btn.disabled=false; }
+}
+
+async function regenWish(id){
+  if(!canWrite()) return;
+  if(!CFG.apiKey){ toast('Configure a chave da API Anthropic em Configuracoes','err'); return; }
+  const w=S.wishes.find(x=>x.id===id); if(!w)return;
+  toast('Gerando parecer da IA...','');
+  try{
+    const analise=await analyzeWish(w);
+    await sb(`wishes?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({analise})});
+    toast('Parecer atualizado!','ok');
+    await loadAll(true);
+  }catch(e){ console.error(e); toast('Erro ao gerar o parecer. Tente novamente.','err'); }
+}
+
+async function delWish(id){
+  if(!canWrite()) return;
+  if(!confirm('Remover este item da lista?'))return;
+  try{
+    await sb(`wishes?id=eq.${id}`,{method:'DELETE'});
+    await loadAll(true);
+  }catch(e){ console.error(e); toast('Erro ao remover. Tente novamente.','err'); }
 }
 
 /* ============================================================
