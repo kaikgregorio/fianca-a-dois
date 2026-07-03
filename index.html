@@ -56,7 +56,7 @@
 [data-theme="dark"] .tag-variable{color:#FCD34D;}
 [data-theme="dark"] .tag-open{color:#FCD34D;}
 [data-theme="dark"] .toast{background:#2A323C;}
-.theme-btn{background:none;border:none;width:44px;height:44px;margin-left:auto;display:flex;align-items:center;justify-content:center;color:var(--text-2);}
+.theme-btn{position:fixed;top:5px;right:8px;z-index:210;background:none;border:none;width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:var(--text-2);}
 .theme-btn svg{width:20px;height:20px;stroke-width:2;}
 
 /* ============================================================
@@ -309,10 +309,10 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
   </button>
   <div class="topbar-title">Financa a Dois</div>
-  <button class="theme-btn" onclick="toggleTheme()" aria-label="Alternar tema">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
-  </button>
 </header>
+<button class="theme-btn" onclick="toggleTheme()" aria-label="Alternar tema">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+</button>
 
 <div class="drawer-backdrop" id="drawerBackdrop" onclick="toggleDrawer(false)"></div>
 
@@ -353,10 +353,6 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06A1.65 1.65 0 0015 19.4a1.65 1.65 0 00-1.65 1.5V21a2 2 0 01-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06-.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.5-1.65H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001.65-1.5V3a2 2 0 014 0v.09A1.65 1.65 0 0016 4.6a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.5 1.65H21a2 2 0 010 4h-.09A1.65 1.65 0 0019.4 15z"/></svg>
       <span>Configuracoes</span>
     </button>
-    <button class="nav-btn" onclick="toggleTheme()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
-      <span id="themeLblSide">Modo noite</span>
-    </button>
   </nav>
 </aside>
 
@@ -385,6 +381,10 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
     <div class="g2">
       <div class="card"><div class="card-label">Gasto por pessoa</div><div id="partnerBars"></div></div>
       <div class="card"><div class="card-label">Limites por categoria</div><div id="catLimits"></div></div>
+    </div>
+    <div class="g2">
+      <div class="card"><div class="card-label">Formas de pagamento (mes)</div><div id="payMethods"></div></div>
+      <div class="card"><div class="card-label">Compras parceladas</div><div id="installments"></div></div>
     </div>
     <div class="g2">
       <div class="card"><div class="card-label">Faturas dos cartoes</div><div id="dashCards"></div></div>
@@ -527,7 +527,8 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
 <div class="overlay" id="modalTx" style="display:none;">
   <div class="modal">
     <div class="modal-grip"></div>
-    <div class="modal-title">Adicionar gasto</div>
+    <div class="modal-title" id="mTxTitle">Adicionar gasto</div>
+    <input type="hidden" id="mTxId">
     <div class="fg"><label>Descricao</label><input type="text" id="mTxDesc" placeholder="Ex: Supermercado"></div>
     <div class="frow">
       <div class="fg"><label>Valor (R$)</label><input type="number" id="mTxAmt" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
@@ -540,6 +541,24 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
     <div class="frow">
       <div class="fg"><label>Pessoa</label><select id="mTxPerson"></select></div>
       <div class="fg"><label>Tipo</label><select id="mTxType"><option value="variable">Variavel</option><option value="fixed">Fixa</option></select></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Metodo de pagamento</label>
+        <select id="mTxMetodo" onchange="toggleParcelas('mTxMetodo','mTxParcWrap')">
+          <option value="pix">Pix / Debito</option>
+          <option value="credit">Credito</option>
+        </select>
+      </div>
+      <div class="fg" id="mTxParcWrap" style="display:none;"><label>Parcelas</label>
+        <select id="mTxParc">
+          <option value="1">A vista (1x)</option>
+          <option value="2">2x</option><option value="3">3x</option><option value="4">4x</option>
+          <option value="5">5x</option><option value="6">6x</option><option value="7">7x</option>
+          <option value="8">8x</option><option value="9">9x</option><option value="10">10x</option>
+          <option value="11">11x</option><option value="12">12x</option>
+          <option value="15">15x</option><option value="18">18x</option><option value="24">24x</option>
+        </select>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeM('modalTx')">Cancelar</button>
@@ -584,7 +603,8 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
 <div class="overlay" id="modalCat" style="display:none;">
   <div class="modal">
     <div class="modal-grip"></div>
-    <div class="modal-title">Nova categoria</div>
+    <div class="modal-title" id="mCatTitle">Nova categoria</div>
+    <input type="hidden" id="mCatId">
     <div class="fg"><label>Nome</label><input type="text" id="mCatName" placeholder="Ex: Alimentacao"></div>
     <div class="frow">
       <div class="fg"><label>Cor</label><input type="color" id="mCatColor" value="#4CAF7D"></div>
@@ -732,8 +752,6 @@ function cssVar(n){ return getComputedStyle(document.documentElement).getPropert
 function applyTheme(){
   const dark = CFG.theme==='dark';
   document.documentElement.dataset.theme = dark?'dark':'light';
-  const lbl=document.getElementById('themeLblSide');
-  if(lbl) lbl.textContent = dark?'Modo dia':'Modo noite';
   const meta=document.querySelector('meta[name="theme-color"]');
   if(meta) meta.content = dark?'#101418':'#4CAF7D';
 }
@@ -878,12 +896,14 @@ Categorias disponiveis: ${catCtx}
 Parceiro 0: ${pn(0)}, Parceiro 1: ${pn(1)}
 
 Formato de resposta:
-{"valor":0,"descricao":"","categoria":"","subcategoria":"","data":"","pessoa":"both","tipo":"variable"}
+{"valor":0,"descricao":"","categoria":"","subcategoria":"","data":"","pessoa":"both","tipo":"variable","metodo":"pix","parcelas":1}
 
 - data: formato YYYY-MM-DD, hoje = ${today()} se nao informado
 - pessoa: "0" para ${pn(0)}, "1" para ${pn(1)}, "both" se nao especificado
 - tipo: "fixed" para despesa recorrente/fixa, "variable" para gasto pontual
 - categoria: use uma das categorias listadas
+- metodo: "credit" se mencionar cartao de credito, credito ou parcelamento; senao "pix"
+- parcelas: numero de parcelas se mencionado (ex: "parcelei em 3x" = 3); senao 1
 - se valor nao identificado, use 0`;
 
   try {
@@ -917,7 +937,9 @@ Formato de resposta:
       sub: parsed.subcategoria||'',
       data: parsed.data||today(),
       pessoa: parsed.pessoa||'both',
-      tipo: parsed.tipo||'variable'
+      tipo: parsed.tipo||'variable',
+      metodo: parsed.metodo==='credit'?'credit':'pix',
+      parcelas: Math.max(1, parseInt(parsed.parcelas)||1)
     };
     showConfirmModal(pending);
   } catch(e){
@@ -951,6 +973,19 @@ function showConfirmModal(p){
         <option value="variable" ${p.tipo==='variable'?'selected':''}>Variavel</option>
         <option value="fixed" ${p.tipo==='fixed'?'selected':''}>Fixa</option>
       </select></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Metodo de pagamento</label>
+        <select id="cfMetodo" onchange="toggleParcelas('cfMetodo','cfParcWrap')">
+          <option value="pix" ${p.metodo!=='credit'?'selected':''}>Pix / Debito</option>
+          <option value="credit" ${p.metodo==='credit'?'selected':''}>Credito</option>
+        </select>
+      </div>
+      <div class="fg" id="cfParcWrap" style="display:${p.metodo==='credit'?'':'none'};"><label>Parcelas</label>
+        <select id="cfParc">
+          ${[1,2,3,4,5,6,7,8,9,10,11,12,15,18,24].map(n=>`<option value="${n}" ${n===(p.parcelas||1)?'selected':''}>${n===1?'A vista (1x)':n+'x'}</option>`).join('')}
+        </select>
+      </div>
     </div>`;
   openM('modalConfirm');
 }
@@ -960,6 +995,7 @@ async function saveConfirm(){
   const btn=document.getElementById('btnCfmSave');
   btn.disabled=true;
   try{
+    const metodo=document.getElementById('cfMetodo').value;
     await sb('transactions',{ method:'POST', body: JSON.stringify({
       descricao: document.getElementById('cfDesc').value,
       valor: parseFloat(document.getElementById('cfVal').value)||0,
@@ -967,7 +1003,9 @@ async function saveConfirm(){
       sub: document.getElementById('cfSub').value,
       data: document.getElementById('cfData').value,
       pessoa: document.getElementById('cfPes').value,
-      tipo: document.getElementById('cfTipo').value
+      tipo: document.getElementById('cfTipo').value,
+      metodo,
+      parcelas: metodo==='credit' ? (parseInt(document.getElementById('cfParc').value)||1) : 1
     })});
     closeM('modalConfirm');
     document.getElementById('aiInput').value='';
@@ -1039,6 +1077,21 @@ function daysUntil(d){
   const x=new Date(d); x.setHours(0,0,0,0);
   return Math.round((x-t)/86400000);
 }
+/* periodo de compras coberto pela fatura ym:
+   do dia seguinte ao fechamento anterior ate o dia do fechamento */
+function clampDate(y,m,d){
+  const dim=new Date(y,m+1,0).getDate();
+  return new Date(y,m,Math.min(d,dim));
+}
+function cycleRange(card, ym){
+  const c=Number(card.close_day);
+  const y=Math.floor(ym/12), m=ym%12;
+  const end=clampDate(y,m,c);
+  const prev=clampDate(m===0?y-1:y, m===0?11:m-1, c);
+  const start=new Date(prev); start.setDate(start.getDate()+1);
+  return {start,end};
+}
+function fmtD(d){ return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`; }
 
 /* ============================================================
    DASHBOARD
@@ -1096,6 +1149,45 @@ function renderDash(){
     </div>`;
   }).join('')||'<div style="color:var(--text-3);font-size:12px;">Nenhum limite configurado. Defina limites em Categorias.</div>';
   document.getElementById('catLimits').innerHTML=limHtml;
+
+  /* formas de pagamento do mes */
+  const totPix=mTx.filter(t=>t.metodo!=='credit').reduce((s,t)=>s+Number(t.valor),0);
+  const totCred=mTx.filter(t=>t.metodo==='credit').reduce((s,t)=>s+Number(t.valor),0);
+  const totPm=Math.max(totPix+totCred,1);
+  document.getElementById('payMethods').innerHTML = (totPix+totCred)===0
+    ? '<div style="color:var(--text-3);font-size:12px;">Nenhum gasto registrado neste mes.</div>'
+    : `<div class="p-bar">
+        <div class="p-name">Pix/Debito</div>
+        <div class="p-track"><div class="p-fill" style="width:${(totPix/totPm*100).toFixed(0)}%;background:var(--green);"></div></div>
+        <div class="p-amt">${fmt(totPix)}</div>
+      </div>
+      <div class="p-bar">
+        <div class="p-name">Credito</div>
+        <div class="p-track"><div class="p-fill" style="width:${(totCred/totPm*100).toFixed(0)}%;background:#8B5CF6;"></div></div>
+        <div class="p-amt">${fmt(totCred)}</div>
+      </div>
+      <div style="font-size:11px;color:var(--text-3);margin-top:6px;">${((totCred/totPm)*100).toFixed(0)}% dos gastos do mes foram no credito</div>`;
+
+  /* compras parceladas: pagas vs restantes */
+  const parcTx=S.tx.filter(t=>t.metodo==='credit' && Number(t.parcelas)>1);
+  const activeParc=parcTx.map(t=>{
+    const [y,m]=String(t.data).split('-').map(Number);
+    const buyYm=y*12+(m-1);
+    const n=Number(t.parcelas);
+    const paid=Math.min(Math.max(ymNow()-buyYm+1,0),n);
+    return {...t,n,paid,left:n-paid};
+  }).filter(t=>t.left>0).sort((a,b)=>b.left-a.left);
+  document.getElementById('installments').innerHTML = activeParc.length===0
+    ? '<div style="color:var(--text-3);font-size:12px;">Nenhuma compra parcelada em andamento.</div>'
+    : activeParc.slice(0,6).map(t=>`
+      <div style="margin-bottom:11px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;gap:8px;">
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(t.descricao)}</span>
+          <span style="color:var(--text-2);white-space:nowrap;">${t.paid}/${t.n} pagas · ${fmt(Number(t.valor)/t.n)}/mes</span>
+        </div>
+        <div class="prog-track"><div class="prog-fill" style="width:${(t.paid/t.n*100).toFixed(0)}%;background:#8B5CF6;"></div></div>
+        <div style="font-size:10px;color:var(--text-3);margin-top:3px;">faltam ${t.left} parcela${t.left>1?'s':''} — ${fmt(Number(t.valor)/t.n*t.left)}</div>
+      </div>`).join('');
 
   document.getElementById('dashCards').innerHTML = S.cards.length===0
     ? '<div style="color:var(--text-3);font-size:12px;">Nenhum cartao cadastrado. Adicione em Cartoes.</div>'
@@ -1163,13 +1255,16 @@ function renderTx(){
     : txs.map(t=>{
         const c=catById(t.cat_id);
         const per=t.pessoa==='both'?'Ambos':pn(Number(t.pessoa));
+        const nParc=Math.max(1,Number(t.parcelas)||1);
+        const met=(t.metodo==='credit') ? `Credito${nParc>1?' '+nParc+'x':''}` : 'Pix/Debito';
         return `<div class="tx-item">
           <div class="tx-dot" style="background:${c.color};"></div>
           <div class="tx-info">
             <div class="tx-desc">${escHtml(t.descricao)}</div>
-            <div class="tx-meta">${escHtml(c.name)}${t.sub?' · '+escHtml(t.sub):''} · ${escHtml(per)} · ${fmtDate(t.data)} · <span class="tag ${t.tipo==='fixed'?'tag-fixed':'tag-variable'}">${t.tipo==='fixed'?'Fixa':'Variavel'}</span></div>
+            <div class="tx-meta">${escHtml(c.name)}${t.sub?' · '+escHtml(t.sub):''} · ${escHtml(per)} · ${fmtDate(t.data)} · ${met} · <span class="tag ${t.tipo==='fixed'?'tag-fixed':'tag-variable'}">${t.tipo==='fixed'?'Fixa':'Variavel'}</span></div>
           </div>
           <div class="tx-amount">-${fmt(t.valor)}</div>
+          <button class="tx-del" onclick="openTxModal('${t.id}')" aria-label="Editar" style="font-size:13px;">&#9998;</button>
           <button class="tx-del" onclick="delTx('${t.id}')" aria-label="Remover">&#10005;</button>
         </div>`;
       }).join('');
@@ -1185,29 +1280,52 @@ async function delTx(id){
   }catch(e){ console.error(e); toast('Erro ao remover. Tente novamente.','err'); }
 }
 
-function openTxModal(){
+function toggleParcelas(selId, wrapId){
+  const metodo=document.getElementById(selId).value;
+  document.getElementById(wrapId).style.display = metodo==='credit' ? '' : 'none';
+}
+
+function openTxModal(id){
+  const t = id ? S.tx.find(x=>x.id===id) : null;
   populateCatSelect('mTxCat');
-  updateSubs('mTxSub','mTxCat');
   populatePersonSelect('mTxPerson');
-  document.getElementById('mTxDate').value=today();
+  document.getElementById('mTxTitle').textContent = t ? 'Editar gasto' : 'Adicionar gasto';
+  document.getElementById('mTxId').value = t ? t.id : '';
+  document.getElementById('mTxDesc').value = t ? t.descricao : '';
+  document.getElementById('mTxAmt').value = t ? t.valor : '';
+  document.getElementById('mTxDate').value = t ? t.data : today();
+  if(t && t.cat_id) document.getElementById('mTxCat').value = t.cat_id;
+  updateSubs('mTxSub','mTxCat');
+  if(t && t.sub) document.getElementById('mTxSub').value = t.sub;
+  document.getElementById('mTxPerson').value = t ? String(t.pessoa) : '0';
+  document.getElementById('mTxType').value = t ? t.tipo : 'variable';
+  document.getElementById('mTxMetodo').value = t ? (t.metodo||'pix') : 'pix';
+  document.getElementById('mTxParc').value = t ? String(t.parcelas||1) : '1';
+  toggleParcelas('mTxMetodo','mTxParcWrap');
   openM('modalTx');
 }
 
 async function saveTx(){
   if(!canWrite()) return;
+  const id=document.getElementById('mTxId').value;
   const desc=document.getElementById('mTxDesc').value.trim();
   const val=parseFloat(document.getElementById('mTxAmt').value)||0;
   if(!desc||!val){toast('Preencha descricao e valor','err');return;}
+  const metodo=document.getElementById('mTxMetodo').value;
+  const body={
+    descricao:desc, valor:val,
+    cat_id:document.getElementById('mTxCat').value||null,
+    sub:document.getElementById('mTxSub').value,
+    pessoa:document.getElementById('mTxPerson').value,
+    tipo:document.getElementById('mTxType').value,
+    data:document.getElementById('mTxDate').value,
+    metodo,
+    parcelas: metodo==='credit' ? (parseInt(document.getElementById('mTxParc').value)||1) : 1
+  };
   try{
-    await sb('transactions',{method:'POST',body:JSON.stringify({
-      descricao:desc, valor:val,
-      cat_id:document.getElementById('mTxCat').value||null,
-      sub:document.getElementById('mTxSub').value,
-      pessoa:document.getElementById('mTxPerson').value,
-      tipo:document.getElementById('mTxType').value,
-      data:document.getElementById('mTxDate').value
-    })});
-    closeM('modalTx'); toast('Gasto adicionado!','ok');
+    if(id) await sb(`transactions?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(body)});
+    else await sb('transactions',{method:'POST',body:JSON.stringify(body)});
+    closeM('modalTx'); toast(id?'Gasto atualizado!':'Gasto adicionado!','ok');
     document.getElementById('mTxDesc').value=''; document.getElementById('mTxAmt').value='';
     await loadAll(true);
   }catch(e){ console.error(e); toast('Erro ao gravar. Tente novamente.','err'); }
@@ -1280,6 +1398,7 @@ function renderCards(){
         const openVal=invoiceValue(c,ymOpen);
         const closedVal=invoiceValue(c,ymClosed);
         const closedPaid=isPaid(c.id,ymClosed);
+        const rc=cycleRange(c,ymClosed), ro=cycleRange(c,ymOpen);
         const recent=S.cardTx.filter(t=>t.card_id===c.id).slice(0,5);
         return `<div class="cc-card">
           <div class="cc-band" style="background:${c.color};"></div>
@@ -1296,7 +1415,7 @@ function renderCards(){
             </div>
             <div class="cc-invoice">
               <div>
-                <div class="cc-inv-label">Fatura fechada (${ymLabel(ymClosed)}) · vence ${fmtDate(dueDateIso(c,ymClosed))}</div>
+                <div class="cc-inv-label">Fatura fechada · compras de ${fmtD(rc.start)} a ${fmtD(rc.end)} · vence ${fmtDate(dueDateIso(c,ymClosed))}</div>
                 <div class="cc-inv-val">${fmt(closedVal)}</div>
               </div>
               ${closedPaid
@@ -1307,7 +1426,7 @@ function renderCards(){
             </div>
             <div class="cc-invoice">
               <div>
-                <div class="cc-inv-label">Fatura atual (${ymLabel(ymOpen)}) · fecha dia ${c.close_day}</div>
+                <div class="cc-inv-label">Fatura atual · compras de ${fmtD(ro.start)} a ${fmtD(ro.end)} · fecha ${fmtD(ro.end)}</div>
                 <div class="cc-inv-val">${fmt(openVal)}</div>
               </div>
               <span class="tag tag-open">Aberta</span>
@@ -1423,7 +1542,7 @@ async function payInvoice(cardId, ym){
     const catFix=S.cats.find(c=>c.name.toLowerCase()==='contas fixas');
     await sb('card_payments',{method:'POST',body:JSON.stringify({card_id:cardId, mes:ymKey(ym)})});
     await sb('transactions',{method:'POST',body:JSON.stringify({
-      descricao:`Fatura ${card.name} (${ymLabel(ym)})`,
+      descricao:`Fatura ${card.name} (venc. ${fmtDate(dueDateIso(card,ym))})`,
       valor:val,
       cat_id:catFix?catFix.id:null,
       sub:'',
@@ -1449,41 +1568,54 @@ function renderCats(){
         <div style="font-size:11px;color:var(--text-2);margin-top:4px;">${c.limit>0?'Limite do casal: '+fmt(c.limit):'Sem limite definido'}</div>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0;">
+        <button class="btn btn-secondary btn-sm" onclick="openCatModal('${c.id}')">Editar</button>
         <button class="btn btn-secondary btn-sm" onclick="openLimitModal('${c.id}')">Limite</button>
         <button class="btn btn-secondary btn-sm" onclick="delCat('${c.id}')">&#10005;</button>
       </div>
     </div>`).join('')||'<div class="empty">Nenhuma categoria. Rode o script SQL no Supabase ou crie uma nova.</div>';
 }
 
-function openCatModal(){
-  document.getElementById('mCatName').value='';
-  document.getElementById('mCatColor').value='#4CAF7D';
-  document.getElementById('mCatLimit').value='';
-  document.getElementById('mCatSubs').value='';
+function openCatModal(id){
+  const c = id ? S.cats.find(x=>x.id===id) : null;
+  document.getElementById('mCatTitle').textContent = c ? 'Editar categoria' : 'Nova categoria';
+  document.getElementById('mCatId').value = c ? c.id : '';
+  document.getElementById('mCatName').value = c ? c.name : '';
+  document.getElementById('mCatColor').value = c ? c.color : '#4CAF7D';
+  document.getElementById('mCatLimit').value = c ? (c.limit||'') : '';
+  document.getElementById('mCatSubs').value = c ? (c.subs||[]).join('\n') : '';
   openM('modalCat');
 }
 
 async function saveCat(){
   if(!canWrite()) return;
+  const id=document.getElementById('mCatId').value;
   const name=document.getElementById('mCatName').value.trim();
   if(!name){toast('Informe o nome','err');return;}
+  const body={
+    name,
+    color:document.getElementById('mCatColor').value,
+    limit_value:parseFloat(document.getElementById('mCatLimit').value)||0,
+    subs:document.getElementById('mCatSubs').value.split('\n').map(s=>s.trim()).filter(Boolean)
+  };
   try{
-    await sb('categories',{method:'POST',body:JSON.stringify({
-      name,
-      color:document.getElementById('mCatColor').value,
-      limit_value:parseFloat(document.getElementById('mCatLimit').value)||0,
-      subs:document.getElementById('mCatSubs').value.split('\n').map(s=>s.trim()).filter(Boolean)
-    })});
-    closeM('modalCat'); toast('Categoria criada!','ok');
+    if(id) await sb(`categories?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(body)});
+    else await sb('categories',{method:'POST',body:JSON.stringify(body)});
+    closeM('modalCat'); toast(id?'Categoria atualizada!':'Categoria criada!','ok');
     await loadAll(true);
   }catch(e){ console.error(e); toast('Erro ao gravar. Tente novamente.','err'); }
 }
 
 async function delCat(id){
   if(!canWrite()) return;
-  if(!confirm('Remover categoria? Os gastos dela ficam sem categoria.'))return;
+  const c=catById(id);
+  const emUso=S.tx.filter(t=>t.cat_id===id).length;
+  const msg = emUso>0
+    ? `Atencao: ${emUso} gasto${emUso>1?'s':''} usa${emUso>1?'m':''} a categoria "${c.name}". Ao excluir, esses gastos ficam sem categoria. Excluir mesmo assim?`
+    : `Remover a categoria "${c.name}"?`;
+  if(!confirm(msg))return;
   try{
     await sb(`categories?id=eq.${id}`,{method:'DELETE'});
+    toast('Categoria removida');
     await loadAll(true);
   }catch(e){ console.error(e); toast('Erro ao remover. Tente novamente.','err'); }
 }
