@@ -242,6 +242,19 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
 /* ============================================================
    CATEGORY & CARTAO ROWS
    ============================================================ */
+#loginScreen{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;background:var(--bg);padding:20px;}
+#loginScreen.show{display:flex;}
+.login-card{width:100%;max-width:400px;background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-md);padding:34px 26px;}
+.login-logo{width:54px;height:54px;border-radius:15px;background:var(--green);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;}
+.login-logo svg{width:26px;height:26px;stroke:#fff;fill:none;stroke-width:2;}
+.login-title{font-size:22px;font-weight:800;text-align:center;letter-spacing:-.02em;}
+.login-sub{font-size:12.5px;color:var(--text-2);text-align:center;margin:7px 0 24px;line-height:1.55;}
+.login-err{display:none;background:rgba(220,38,38,.09);color:var(--red);font-size:12px;border-radius:var(--r-sm);padding:9px 11px;margin-bottom:12px;}
+.login-foot{font-size:11px;color:var(--text-3);text-align:center;margin-top:16px;}
+.pass-wrap{position:relative;}
+.pass-wrap input{padding-right:42px;}
+.pass-eye{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-3);padding:4px;display:flex;}
+.pass-eye svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;}
 .cat-row{display:flex;align-items:flex-start;gap:10px;padding:13px;background:var(--white);border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:8px;box-shadow:var(--shadow-sm);}
 .cat-row.dragging{opacity:.65;box-shadow:var(--shadow-md);border-color:var(--green);position:relative;z-index:5;}
 .drag-handle{touch-action:none;cursor:grab;color:var(--text-3);padding:4px 2px;margin:-2px 0 0 -4px;flex-shrink:0;display:flex;align-items:center;}
@@ -354,7 +367,7 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
     </button>
     <button class="nav-btn" data-view="cards">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-      <span>Cartoes</span>
+      <span>Cartoes e beneficios</span>
     </button>
     <button class="nav-btn" data-view="goals">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
@@ -441,7 +454,6 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
         <div class="card-label" style="margin-bottom:0;">Gastos recorrentes</div>
         <button class="btn btn-primary btn-sm" onclick="openRecModal()">+ Recorrente</button>
       </div>
-      <div style="font-size:11px;color:var(--text-3);margin-bottom:10px;">Lancados automaticamente todo mes no dia escolhido, como Pix/Debito fixo.</div>
       <div id="recList"></div>
     </div>
     <div class="card" style="padding:6px 16px;"><div id="txList"></div></div>
@@ -462,7 +474,7 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
   <!-- CARTOES DE CREDITO -->
   <div class="view" id="view-cards">
     <div class="header-row">
-      <div><div class="page-title">Cartoes de credito</div><div class="page-sub">faturas, compras e vencimentos</div></div>
+      <div><div class="page-title">Cartoes e beneficios</div><div class="page-sub">faturas, compras e saldos do mes</div></div>
       <button class="btn btn-primary btn-sm" onclick="openCardModal()">+ Novo cartao</button>
     </div>
     <div id="ccList"></div>
@@ -549,6 +561,7 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
     </div>
 
     <div id="invFin" style="display:none;">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn btn-secondary btn-sm" onclick="clearFin()">Limpar conversa</button></div>
       <div class="card">
         <div class="card-label">Assessor Fin</div>
         <div class="chat-box" id="finChat"></div>
@@ -627,6 +640,12 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
       </div>
       <div class="fg"><input type="password" id="sApiKey" placeholder="sk-ant-..."></div>
       <button class="btn btn-primary btn-sm" id="btnSaveKey" onclick="saveApiKey()">Salvar</button>
+    </div>
+
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-label" style="margin-bottom:14px;">Conta</div>
+      <div style="font-size:13px;margin-bottom:12px;">Conectado como <b id="accEmail">—</b></div>
+      <button class="btn btn-secondary btn-sm" onclick="doLogout()">Sair da conta</button>
     </div>
 
     <div class="card">
@@ -856,7 +875,7 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
     <div class="fg"><label>Nome da meta</label><input type="text" id="mGoalName" placeholder="Ex: Viagem, Carro, Reserva de emergencia"></div>
     <div class="frow">
       <div class="fg"><label>Valor total (R$)</label><input type="number" id="mGoalTotal" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
-      <div class="fg"><label>Ja guardado (R$)</label><input type="number" id="mGoalAtual" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
+      <div class="fg" id="mGoalAtualWrap"><label>Ja guardado (R$)</label><input type="number" id="mGoalAtual" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
     </div>
     <div class="fg"><label>Data limite</label><input type="date" id="mGoalDate"></div>
     <div class="modal-footer">
@@ -874,7 +893,11 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
     <div class="modal-grip"></div>
     <div class="modal-title" id="mDepTitle">Adicionar deposito</div>
     <input type="hidden" id="mDepGoalId">
-    <div class="fg"><label>Valor do deposito (R$)</label><input type="number" id="mDepVal" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
+    <input type="hidden" id="mDepId">
+    <div class="frow">
+      <div class="fg"><label>Valor do deposito (R$)</label><input type="number" id="mDepVal" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
+      <div class="fg"><label>Data</label><input type="date" id="mDepDate"></div>
+    </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeM('modalDeposit')">Cancelar</button>
       <button class="btn btn-primary" onclick="saveDeposit()">Adicionar</button>
@@ -969,6 +992,31 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
   </div>
 </div>
 
+<!-- ============================================================
+     TELA DE LOGIN
+     ============================================================ -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">
+      <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+    </div>
+    <div class="login-title">Finanças a Dois</div>
+    <div class="login-sub">Controle financeiro simples para o dia a dia de casais e profissionais CLT — gastos, cartões, metas e investimentos em um só lugar.</div>
+    <div class="login-err" id="loginErr"></div>
+    <div class="fg"><label>E-mail</label><input type="email" id="loginEmail" placeholder="voce@email.com" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()"></div>
+    <div class="fg"><label>Senha</label>
+      <div class="pass-wrap">
+        <input type="password" id="loginPass" placeholder="Sua senha" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+        <button type="button" class="pass-eye" onclick="togglePass()" aria-label="Mostrar senha">
+          <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="loginBtn" style="width:100%;margin-top:6px;" onclick="doLogin()">Entrar</button>
+    <div class="login-foot">Acesso restrito. As contas do casal são criadas no painel do Supabase.</div>
+  </div>
+</div>
+
 <div class="toast-wrap" id="toasts"></div>
 
 <script>
@@ -984,7 +1032,7 @@ let S = {
   tx: [], rev: [], cats: [],
   cards: [], cardTx: [], cardPay: [],
   goals: [], debts: [], wishes: [],
-  investments: [], recs: [], reports: [],
+  investments: [], recs: [], reports: [], goalDeps: [], finMsgs: [],
   names: ['Parceiro 1','Parceiro 2'],
   online: true, configured: false
 };
@@ -1050,18 +1098,137 @@ function toggleTheme(){
    ============================================================ */
 function sbReady(){ return !!(CFG.sbUrl && CFG.sbKey); }
 
-async function sb(path, opts={}){
+/* ============================================================
+   AUTENTICACAO (Supabase Auth)
+   As credenciais nunca ficam no codigo: e-mail/senha sao dos
+   usuarios criados no painel do Supabase, e o token de sessao
+   fica somente neste dispositivo (localStorage).
+   ============================================================ */
+let SESSION = null;
+try{ SESSION = JSON.parse(localStorage.getItem('fad_session')||'null'); }catch(e){ SESSION=null; }
+
+function saveSession(s){
+  SESSION=s;
+  if(s) localStorage.setItem('fad_session',JSON.stringify(s));
+  else localStorage.removeItem('fad_session');
+}
+function sessionValid(){ return !!(SESSION && SESSION.access_token && (SESSION.expires_at*1000 > Date.now()+30000)); }
+
+async function refreshSession(){
+  if(!SESSION || !SESSION.refresh_token || !sbReady()) return false;
+  try{
+    const r=await fetch(`${CFG.sbUrl}/auth/v1/token?grant_type=refresh_token`,{
+      method:'POST',
+      headers:{'apikey':CFG.sbKey,'Content-Type':'application/json'},
+      body:JSON.stringify({refresh_token:SESSION.refresh_token})
+    });
+    if(!r.ok) return false;
+    const d=await r.json();
+    if(!d.access_token) return false;
+    saveSession({
+      access_token:d.access_token,
+      refresh_token:d.refresh_token||SESSION.refresh_token,
+      expires_at:d.expires_at||Math.floor(Date.now()/1000)+(d.expires_in||3600),
+      email:(d.user&&d.user.email)||SESSION.email
+    });
+    return true;
+  }catch(e){ return false; }
+}
+
+async function authToken(){
+  if(!SESSION) return null;
+  if(!sessionValid()){
+    const ok=await refreshSession();
+    if(!ok){ saveSession(null); showLogin(); return null; }
+  }
+  return SESSION.access_token;
+}
+
+function showLogin(){
+  document.getElementById('loginScreen').classList.add('show');
+  setBanner('');
+}
+function hideLogin(){ document.getElementById('loginScreen').classList.remove('show'); }
+function togglePass(){
+  const el=document.getElementById('loginPass');
+  el.type = el.type==='password' ? 'text' : 'password';
+}
+
+async function doLogin(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  const err=document.getElementById('loginErr');
+  err.style.display='none';
+  if(!sbReady()){ err.textContent='Configure o Supabase em Configuracoes primeiro.'; err.style.display='block'; return; }
+  if(!email||!pass){ err.textContent='Preencha e-mail e senha.'; err.style.display='block'; return; }
+  const btn=document.getElementById('loginBtn');
+  btn.disabled=true; btn.textContent='Entrando...';
+  try{
+    const r=await fetch(`${CFG.sbUrl}/auth/v1/token?grant_type=password`,{
+      method:'POST',
+      headers:{'apikey':CFG.sbKey,'Content-Type':'application/json'},
+      body:JSON.stringify({email,password:pass})
+    });
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok || !d.access_token){
+      const msg=(d.error_description||d.msg||'');
+      err.textContent = /invalid/i.test(msg) ? 'E-mail ou senha incorretos.' : (msg||'Nao foi possivel entrar. Verifique os dados.');
+      err.style.display='block';
+      return;
+    }
+    saveSession({
+      access_token:d.access_token,
+      refresh_token:d.refresh_token,
+      expires_at:d.expires_at||Math.floor(Date.now()/1000)+(d.expires_in||3600),
+      email:(d.user&&d.user.email)||email
+    });
+    document.getElementById('loginPass').value='';
+    hideLogin();
+    updateAccountUI();
+    await loadAll();
+  }catch(e){
+    console.error(e);
+    err.textContent='Falha de conexao. Tente novamente.';
+    err.style.display='block';
+  }finally{ btn.disabled=false; btn.textContent='Entrar'; }
+}
+
+async function doLogout(){
+  if(!confirm('Sair da conta neste aparelho?'))return;
+  try{
+    if(SESSION&&SESSION.access_token){
+      fetch(`${CFG.sbUrl}/auth/v1/logout`,{method:'POST',headers:{'apikey':CFG.sbKey,'Authorization':`Bearer ${SESSION.access_token}`}}).catch(()=>{});
+    }
+  }catch(e){}
+  saveSession(null);
+  showLogin();
+}
+
+function updateAccountUI(){
+  const el=document.getElementById('accEmail');
+  if(el) el.textContent = SESSION&&SESSION.email ? SESSION.email : '—';
+}
+
+async function sb(path, opts={}, _retry=true){
   if(!sbReady()) throw new Error('supabase-not-configured');
+  const tok=await authToken();
+  if(!tok) throw new Error('sem-sessao');
   const r = await fetch(`${CFG.sbUrl}/rest/v1/${path}`, {
     ...opts,
     headers: {
       'apikey': CFG.sbKey,
-      'Authorization': `Bearer ${CFG.sbKey}`,
+      'Authorization': `Bearer ${tok}`,
       'Content-Type': 'application/json',
       'Prefer': 'return=representation',
       ...(opts.headers||{})
     }
   });
+  if(r.status===401 && _retry){
+    const ok=await refreshSession();
+    if(ok) return sb(path, opts, false);
+    saveSession(null); showLogin();
+    throw new Error('sessao-expirada');
+  }
   if(!r.ok){
     const txt = await r.text().catch(()=>'');
     throw new Error(`supabase ${r.status}: ${txt}`);
@@ -1072,8 +1239,9 @@ async function sb(path, opts={}){
 
 async function loadAll(silent=false){
   if(!sbReady()){ setBanner('setup'); render(); return; }
+  if(!SESSION){ showLogin(); return; }
   try{
-    const [cats, tx, rev, cfg, cards, cardTx, cardPay, goals, debts, wishes, investments, recs, reports] = await Promise.all([
+    const [cats, tx, rev, cfg, cards, cardTx, cardPay, goals, debts, wishes, investments, recs, reports, goalDeps, finRows] = await Promise.all([
       sb('categories?select=*&order=ordem.asc,created_at.asc'),
       sb('transactions?select=*&order=data.desc,created_at.desc&limit=500'),
       sb('revenues?select=*&order=created_at.asc'),
@@ -1086,7 +1254,9 @@ async function loadAll(silent=false){
       sb('wishes?select=*&order=created_at.desc'),
       sb('investments?select=*&order=created_at.desc'),
       sb('recurrings?select=*&order=dia.asc'),
-      sb('monthly_reports?select=*&order=mes.desc')
+      sb('monthly_reports?select=*&order=mes.desc'),
+      sb('goal_deposits?select=*&order=data.desc,created_at.desc'),
+      sb('fin_messages?select=*&order=ordem.asc&limit=300')
     ]);
     S.cats = (cats||[]).map(c=>({...c, subs:Array.isArray(c.subs)?c.subs:[], limit:Number(c.limit_value)||0}));
     S.tx = tx||[];
@@ -1100,6 +1270,8 @@ async function loadAll(silent=false){
     S.investments = investments||[];
     S.recs = recs||[];
     S.reports = reports||[];
+    S.goalDeps = goalDeps||[];
+    S.finMsgs = finRows||[];
     if(cfg && cfg[0]) S.names = [cfg[0].partner1, cfg[0].partner2];
     S.online = true; S.configured = true;
     setBanner('');
@@ -1129,9 +1301,9 @@ function setBanner(mode){
 function syncNow(manual=false){
   loadAll(true).then(()=>{ if(manual && S.online) toast('Dados sincronizados','ok'); });
 }
-setInterval(()=>{ if(sbReady()) syncNow(); }, 30000);
-document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && sbReady()) syncNow(); });
-window.addEventListener('online', ()=>{ if(sbReady()) syncNow(); });
+setInterval(()=>{ if(sbReady() && SESSION) syncNow(); }, 30000);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && sbReady() && SESSION) syncNow(); });
+window.addEventListener('online', ()=>{ if(sbReady() && SESSION) syncNow(); });
 window.addEventListener('offline', ()=>{ S.online=false; setBanner('off'); });
 
 function canWrite(){
@@ -1889,7 +2061,7 @@ function renderCards(){
       }).join('');
 
   const benefitHtml = benefitCards.length===0
-    ? '<div style="color:var(--text-3);font-size:12px;">Nenhum cartao beneficio (VR/VA). Crie em "+ Novo cartao" escolhendo o tipo Beneficio.</div>'
+    ? '<div style="color:var(--text-3);font-size:12px;">Nenhum beneficio cadastrado (VR/VA, iFood, auxilio home office...). Crie em "+ Novo cartao" escolhendo o tipo Beneficio.</div>'
     : benefitCards.map(c=>{
         const b=benefitBalance(c);
         const pct=b.total>0?Math.min(100,Math.max(b.gasto/b.total*100,0)):0;
@@ -2080,7 +2252,7 @@ async function payInvoice(cardId, ym){
 function renderRecs(){
   const el=document.getElementById('recList'); if(!el)return;
   el.innerHTML = S.recs.length===0
-    ? '<div style="color:var(--text-3);font-size:12px;">Nenhum recorrente cadastrado. Ex: internet, energia, racao da Kiara.</div>'
+    ? ''
     : S.recs.map(r=>{
         const c=catById(r.cat_id);
         return `<div class="tx-item">
@@ -2191,11 +2363,16 @@ function monthsUntil(iso){
   return Math.max((y-t.getFullYear())*12 + (m-1-t.getMonth()), 1);
 }
 
+function goalSaved(goalId){
+  return S.goalDeps.filter(d=>d.goal_id===goalId).reduce((s,d)=>s+Number(d.valor),0);
+}
+
 function renderGoals(){
   document.getElementById('goalList').innerHTML = S.goals.length===0
     ? '<div class="empty">Nenhuma meta cadastrada. Toque em "+ Nova meta" para criar a primeira.</div>'
     : S.goals.map(g=>{
-        const total=Number(g.valor_total), atual=Number(g.valor_atual);
+        const total=Number(g.valor_total), atual=goalSaved(g.id);
+        const deps=S.goalDeps.filter(d=>d.goal_id===g.id);
         const pct=total>0?Math.min(100,(atual/total)*100):0;
         const falta=Math.max(total-atual,0);
         const meses=monthsUntil(g.data_limite);
@@ -2223,6 +2400,20 @@ function renderGoals(){
               ? 'Meta atingida! Parabens!'
               : `Para chegar la, guardem <b>${fmt(porMes)}/mes</b> — faltam ${fmt(falta)}.`}
           </div>
+          ${deps.length?`
+          <div style="margin-top:12px;">
+            <div style="font-size:10px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Depositos (${deps.length})</div>
+            <div style="max-height:180px;overflow-y:auto;">
+              ${deps.map(d=>`<div class="tx-item">
+                <div class="tx-info">
+                  <div class="tx-desc">${fmt(d.valor)}</div>
+                  <div class="tx-meta">${fmtDate(d.data)}</div>
+                </div>
+                <button class="tx-del" onclick="openDepositModal('${g.id}','${d.id}')" aria-label="Editar deposito" style="font-size:13px;">&#9998;</button>
+                <button class="tx-del" onclick="delDeposit('${d.id}')" aria-label="Remover deposito">&#10005;</button>
+              </div>`).join('')}
+            </div>
+          </div>`:''}
         </div>`;
       }).join('');
 }
@@ -2233,7 +2424,8 @@ function openGoalModal(id){
   document.getElementById('mGoalId').value = g ? g.id : '';
   document.getElementById('mGoalName').value = g ? g.nome : '';
   document.getElementById('mGoalTotal').value = g ? g.valor_total : '';
-  document.getElementById('mGoalAtual').value = g ? g.valor_atual : '';
+  document.getElementById('mGoalAtual').value = '';
+  document.getElementById('mGoalAtualWrap').style.display = g ? 'none' : '';
   document.getElementById('mGoalDate').value = g ? g.data_limite : '';
   openM('modalGoal');
 }
@@ -2245,14 +2437,14 @@ async function saveGoal(){
   const total=parseFloat(document.getElementById('mGoalTotal').value)||0;
   const dataLim=document.getElementById('mGoalDate').value;
   if(!nome||!total||!dataLim){toast('Preencha nome, valor total e data limite','err');return;}
-  const body={
-    nome, valor_total:total,
-    valor_atual:parseFloat(document.getElementById('mGoalAtual').value)||0,
-    data_limite:dataLim
-  };
+  const body={ nome, valor_total:total, data_limite:dataLim };
   try{
     if(id) await sb(`goals?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(body)});
-    else await sb('goals',{method:'POST',body:JSON.stringify(body)});
+    else {
+      const r=await sb('goals',{method:'POST',body:JSON.stringify(body)});
+      const inicial=parseFloat(document.getElementById('mGoalAtual').value)||0;
+      if(inicial>0 && r && r[0]) await sb('goal_deposits',{method:'POST',body:JSON.stringify({goal_id:r[0].id,valor:inicial,data:today()})});
+    }
     closeM('modalGoal'); toast(id?'Meta atualizada!':'Meta criada!','ok');
     await loadAll(true);
   }catch(e){ console.error(e); toast('Erro ao gravar. Tente novamente.','err'); }
@@ -2267,23 +2459,37 @@ async function delGoal(id){
   }catch(e){ console.error(e); toast('Erro ao remover. Tente novamente.','err'); }
 }
 
-function openDepositModal(goalId){
+function openDepositModal(goalId, depId){
   const g=S.goals.find(x=>x.id===goalId); if(!g)return;
-  document.getElementById('mDepTitle').textContent=`Deposito em "${g.nome}"`;
+  const d = depId ? S.goalDeps.find(x=>x.id===depId) : null;
+  document.getElementById('mDepTitle').textContent = d ? `Editar deposito em "${g.nome}"` : `Deposito em "${g.nome}"`;
   document.getElementById('mDepGoalId').value=goalId;
-  document.getElementById('mDepVal').value='';
+  document.getElementById('mDepId').value = d ? d.id : '';
+  document.getElementById('mDepVal').value = d ? d.valor : '';
+  document.getElementById('mDepDate').value = d ? d.data : today();
   openM('modalDeposit');
+}
+
+async function delDeposit(id){
+  if(!canWrite()) return;
+  if(!confirm('Remover este deposito? O valor sai do total da meta.'))return;
+  try{
+    await sb(`goal_deposits?id=eq.${id}`,{method:'DELETE'});
+    await loadAll(true);
+  }catch(e){ console.error(e); toast('Erro ao remover. Tente novamente.','err'); }
 }
 
 async function saveDeposit(){
   if(!canWrite()) return;
-  const id=document.getElementById('mDepGoalId').value;
+  const goalId=document.getElementById('mDepGoalId').value;
+  const depId=document.getElementById('mDepId').value;
   const val=parseFloat(document.getElementById('mDepVal').value)||0;
-  if(!val){toast('Informe o valor','err');return;}
-  const g=S.goals.find(x=>x.id===id); if(!g)return;
+  const data=document.getElementById('mDepDate').value;
+  if(!val||!data){toast('Informe valor e data','err');return;}
   try{
-    await sb(`goals?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({valor_atual:Number(g.valor_atual)+val})});
-    closeM('modalDeposit'); toast('Deposito registrado!','ok');
+    if(depId) await sb(`goal_deposits?id=eq.${depId}`,{method:'PATCH',body:JSON.stringify({valor:val,data})});
+    else await sb('goal_deposits',{method:'POST',body:JSON.stringify({goal_id:goalId,valor:val,data})});
+    closeM('modalDeposit'); toast(depId?'Deposito atualizado!':'Deposito registrado!','ok');
     await loadAll(true);
   }catch(e){ console.error(e); toast('Erro ao gravar. Tente novamente.','err'); }
 }
@@ -2405,7 +2611,7 @@ function finSnapshot(){
   const credito=mTx.filter(t=>t.metodo==='credit').reduce((s,t)=>s+Number(t.valor),0);
   const faturas=S.cards.map(c=>({cartao:c.name, fatura_aberta:+invoiceValue(c,currentOpenYm(c)).toFixed(2)}));
   const dividasMensal=S.debts.filter(d=>Number(d.parcelas_restantes)>0).reduce((s,d)=>s+Number(d.valor_parcela),0);
-  const metas=S.goals.map(g=>({meta:g.nome, falta:+Math.max(Number(g.valor_total)-Number(g.valor_atual),0).toFixed(2)}));
+  const metas=S.goals.map(g=>({meta:g.nome, guardado:+goalSaved(g.id).toFixed(2), falta:+Math.max(Number(g.valor_total)-goalSaved(g.id),0).toFixed(2)}));
   return JSON.stringify({
     mes:mk,
     receitas_mes:+totRev.toFixed(2),
@@ -2695,9 +2901,9 @@ function renderInvest(){
    ============================================================ */
 const FIN_SYSTEM=`<papel>
 Voce e o Assessor Financeiro do casal dentro do app "Financa a Dois".
-Seu nome e Fin. Voce atua como um assessor de investimentos pessoal,
-especializado em educacao financeira para iniciantes e planejamento
-de longo prazo para casais.
+Seu nome e Fin. Voce e um ESPECIALISTA EM INVESTIMENTOS e atua como
+assessor pessoal do casal: preciso, objetivo e didatico, focado em
+educacao financeira para iniciantes e planejamento de longo prazo.
 
 Voce NAO e um robo de investimentos autonomo. Voce e um guia educativo
 e estrategico que orienta, explica, e recomenda — mas a decisao final
@@ -2825,34 +3031,27 @@ para registrar no app antes de fazer recomendacoes especificas.
   </analise_de_mercado>
 </regras_de_conduta>
 
-<fluxo_de_primeira_interacao>
-Na primeira conversa sobre investimentos, siga esta ordem:
-1. APRESENTE-SE brevemente como o Fin, assessor financeiro do casal
-2. VALIDE o perfil: confirme dados, pergunte sobre dividas existentes, metas de curto/medio/longo prazo, e se ha algum plano especifico (casa, carro, filhos, viagem)
-3. ANALISE os dados do app para entender o momento financeiro
-4. EDUQUE sobre o conceito de reserva de emergencia e por que ela vem primeiro
-5. PROPONHA um plano concreto com valores, prazos e proximos passos
-6. PERGUNTE se tem duvidas antes de avancar
-Nao despeje tudo de uma vez. Va em etapas, uma mensagem por vez,
-como uma conversa natural.
-</fluxo_de_primeira_interacao>
+<formato_de_resposta prioridade="MAXIMA">
+REGRA CENTRAL: responda APENAS o que foi perguntado, sem enrolacao.
+Nada de contexto extra nao solicitado, nada de "antes de responder vale
+lembrar", nada de despejar diagnostico ou plano completo sem pedirem.
 
-<formato_de_resposta>
-- Respostas curtas e conversacionais (maximo 3-4 paragrafos por mensagem)
-- Nao use markdown (nada de asteriscos ou cerquilhas), apenas texto puro
-- Use listas apenas quando comparar produtos ou listar passos
-- Quando fizer calculos, mostre o raciocinio de forma simples
-- Termine sempre com uma pergunta ou proximo passo claro
-- Se o casal fizer uma pergunta fora do escopo financeiro, redirecione gentilmente
+- Limite padrao: ate 2 paragrafos curtos, no maximo ~100 palavras no total
+- Excecao unica: se pedirem explicitamente um plano, comparacao ou passo a passo, use ate 5 itens numerados, uma linha por item
+- Texto puro, sem markdown (nada de asteriscos ou cerquilhas) e sem emojis
+- Prefira numeros concretos a explicacoes longas: "guardem R$ 300/mes por 8 meses" diz mais que um paragrafo
+- Voce recebe o historico da conversa: NAO repita o que ja foi dito nem reapresente o perfil do casal
+- Nao se apresente novamente: o app ja mostra quem voce e
+- Encerre com no maximo UMA pergunta, e so se for necessaria para o proximo passo
+- Pergunta fora do escopo financeiro: redirecione em uma frase
 </formato_de_resposta>`;
 
-let finMsgs=[];
-const FIN_GREET='Ola! Sou o Fin, assessor financeiro de voces. Posso analisar os registros do app, estruturar a reserva de emergencia e orientar os primeiros investimentos, explicando cada passo de forma simples. Por onde gostariam de comecar?';
+const FIN_GREET='Ola! Sou o Fin, assessor financeiro de voces. Pergunte de forma direta que eu respondo objetivamente, com base nos numeros reais do app. Nossa conversa fica salva, entao posso retomar de onde paramos.';
 
 function renderFinChat(typing=false){
   const box=document.getElementById('finChat'); if(!box)return;
   let html=`<div class="msg fin">${escHtml(FIN_GREET)}</div>`;
-  html+=finMsgs.map(m=>`<div class="msg ${m.role==='user'?'user':'fin'}">${escHtml(m.show)}</div>`).join('');
+  html+=S.finMsgs.map(m=>`<div class="msg ${m.role==='user'?'user':'fin'}">${escHtml(m.content)}</div>`).join('');
   if(typing) html+='<div class="msg fin typing">Fin esta digitando...</div>';
   box.innerHTML=html;
   box.scrollTop=box.scrollHeight;
@@ -2865,9 +3064,17 @@ async function sendFin(){
   if(!CFG.apiKey){ toast('Configure a chave da API Anthropic em Configuracoes','err'); return; }
   const btn=document.getElementById('finBtn');
   inp.value=''; btn.disabled=true;
-  finMsgs.push({role:'user', show:text, api:`{{historico_financeiro}}: ${finSnapshot()}\n\nPergunta: ${text}`});
+  S.finMsgs.push({role:'user',content:text});
   renderFinChat(true);
   try{
+    /* envia as ultimas 20 mensagens; o retrato financeiro vai so na ultima */
+    const hist=S.finMsgs.slice(-20);
+    const messages=hist.map((m,i)=>({
+      role:m.role,
+      content:(m.role==='user' && i===hist.length-1)
+        ? `{{historico_financeiro}}: ${finSnapshot()}\n\nPergunta: ${m.content}`
+        : m.content
+    }));
     const r=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{
@@ -2878,23 +3085,40 @@ async function sendFin(){
       },
       body: JSON.stringify({
         model:'claude-haiku-4-5-20251001',
-        max_tokens:1024,
+        max_tokens:600,
         system:FIN_SYSTEM,
-        messages:finMsgs.map(m=>({role:m.role,content:m.api}))
+        messages
       })
     });
     const data=await r.json();
     if(data.error) throw new Error(data.error.message||'api error');
     const reply=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join(' ').trim();
-    finMsgs.push({role:'assistant', show:reply, api:reply});
+    S.finMsgs.push({role:'assistant',content:reply});
     renderFinChat();
+    /* persiste no banco: o Fin lembra em qualquer aparelho */
+    const base=Date.now();
+    sb('fin_messages',{method:'POST',body:JSON.stringify([
+      {role:'user',content:text,ordem:base},
+      {role:'assistant',content:reply,ordem:base+1}
+    ])}).catch(e=>console.error('fin persist',e));
   }catch(e){
     console.error(e);
-    finMsgs.pop();
+    S.finMsgs.pop();
     inp.value=text;
     renderFinChat();
     toast('Erro ao falar com o Fin. Verifique a chave da API e tente de novo.','err');
   }finally{ btn.disabled=false; }
+}
+
+async function clearFin(){
+  if(!canWrite()) return;
+  if(!confirm('Apagar toda a conversa com o Fin? Ele deixara de lembrar o que foi conversado.'))return;
+  try{
+    await sb('fin_messages?ordem=gt.0',{method:'DELETE'});
+    S.finMsgs=[];
+    renderFinChat();
+    toast('Conversa apagada','ok');
+  }catch(e){ console.error(e); toast('Erro ao apagar. Tente novamente.','err'); }
 }
 
 /* ============================================================
@@ -3311,12 +3535,14 @@ function populatePersonSelect(selId, withBoth=true){
    ============================================================ */
 async function init(){
   applyTheme();
+  updateAccountUI();
   if(!sbReady()){
     setBanner('setup');
     setTimeout(()=>toast('Bem-vindos! Configure o Supabase em Configuracoes para comecar.','warn'),700);
     go('settings');
     return;
   }
+  if(!SESSION){ showLogin(); return; }
   await loadAll();
 }
 init();
