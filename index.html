@@ -60,6 +60,18 @@
 .theme-btn svg{width:20px;height:20px;stroke-width:2;}
 
 /* ============================================================
+   SUB-ABAS E CHAT DO FIN
+   ============================================================ */
+.subtabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.subtab{padding:9px 16px;border-radius:99px;border:1px solid var(--border);background:var(--white);font-size:12px;font-weight:600;color:var(--text-2);min-height:38px;}
+.subtab.active{background:var(--green);color:#fff;border-color:var(--green);}
+.chat-box{display:flex;flex-direction:column;gap:8px;max-height:55vh;min-height:200px;overflow-y:auto;padding:4px 2px;}
+.msg{max-width:86%;padding:10px 13px;border-radius:14px;font-size:13px;line-height:1.55;white-space:pre-wrap;word-wrap:break-word;}
+.msg.user{align-self:flex-end;background:var(--green);color:#fff;border-bottom-right-radius:4px;}
+.msg.fin{align-self:flex-start;background:var(--bg);border:1px solid var(--border);border-bottom-left-radius:4px;}
+.msg.typing{color:var(--text-3);font-style:italic;}
+
+/* ============================================================
    RESET & BASE (mobile-first)
    ============================================================ */
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -353,6 +365,10 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
       <span>Desejos</span>
     </button>
+    <button class="nav-btn" data-view="invest">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+      <span>Investimentos</span>
+    </button>
     <button class="nav-btn" data-view="categories">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
       <span>Categorias</span>
@@ -467,6 +483,70 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
       <button class="btn btn-primary btn-sm" onclick="openWishModal()">+ Novo item</button>
     </div>
     <div id="wishList"></div>
+  </div>
+
+  <!-- INVESTIMENTOS -->
+  <div class="view" id="view-invest">
+    <div style="margin-bottom:14px;"><div class="page-title">Investimentos</div><div class="page-sub">simule, aprenda e converse com o Fin</div></div>
+    <div class="subtabs">
+      <button class="subtab active" id="stSim" onclick="switchInvTab('sim')">Simulador</button>
+      <button class="subtab" id="stFin" onclick="switchInvTab('fin')">Assessor Fin</button>
+    </div>
+
+    <div id="invSim">
+      <div class="g2">
+        <div class="card">
+          <div class="card-label">Simulador</div>
+          <div class="fg"><label>Tipo de investimento</label>
+            <select id="invTipo" onchange="fillInvRate(true)">
+              <option value="selic">Tesouro Selic</option>
+              <option value="ipca">Tesouro IPCA+</option>
+              <option value="cdb">CDB (100% CDI)</option>
+              <option value="lci">LCI (isenta de IR)</option>
+              <option value="lca">LCA (isenta de IR)</option>
+              <option value="poupanca">Poupanca (isenta de IR)</option>
+            </select>
+          </div>
+          <div class="frow">
+            <div class="fg"><label>Aporte inicial (R$)</label><input type="number" id="invInicial" value="500" min="0" step="0.01" inputmode="decimal"></div>
+            <div class="fg"><label>Aporte mensal (R$)</label><input type="number" id="invMensal" value="500" min="0" step="0.01" inputmode="decimal"></div>
+          </div>
+          <div class="frow">
+            <div class="fg"><label>Prazo (meses)</label><input type="number" id="invPrazo" value="24" min="1" max="480" inputmode="numeric"></div>
+            <div class="fg"><label>Taxa estimada (% ao ano)</label><input type="number" id="invTaxa" step="0.1" min="0" inputmode="decimal"></div>
+          </div>
+          <div class="alert alert-blue" style="font-size:11px;">A taxa vem preenchida com um valor de referencia do mercado e pode ser ajustada. Rentabilidade estimada, nunca garantida.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" onclick="calcInvest()">Calcular projecao</button>
+            <button class="btn btn-secondary btn-sm" onclick="saveInvestment()">Salvar simulacao</button>
+          </div>
+        </div>
+        <div class="card"><div class="card-label">Resultado</div><div id="invResult"><div style="color:var(--text-3);font-size:12px;">Preencha os campos e toque em Calcular projecao.</div></div></div>
+      </div>
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-label">Evolucao mes a mes</div>
+        <canvas id="invChart" style="width:100%;max-height:220px;"></canvas>
+        <div style="display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--text-2);">
+          <span><span style="display:inline-block;width:10px;height:3px;background:var(--green);border-radius:2px;margin-right:4px;vertical-align:middle;"></span>Saldo projetado</span>
+          <span><span style="display:inline-block;width:10px;height:3px;background:#3B82F6;border-radius:2px;margin-right:4px;vertical-align:middle;"></span>Total investido</span>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-label">Simulacoes salvas</div>
+        <div id="invList"></div>
+      </div>
+    </div>
+
+    <div id="invFin" style="display:none;">
+      <div class="card">
+        <div class="card-label">Assessor Fin</div>
+        <div class="chat-box" id="finChat"></div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <input class="ai-input" id="finInput" placeholder="Pergunte ao Fin..." onkeydown="if(event.key==='Enter')sendFin()" style="flex:1;">
+          <button class="btn btn-primary" id="finBtn" onclick="sendFin()">Enviar</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- CATEGORIAS -->
@@ -843,6 +923,7 @@ let S = {
   tx: [], rev: [], cats: [],
   cards: [], cardTx: [], cardPay: [],
   goals: [], debts: [], wishes: [],
+  investments: [],
   names: ['Parceiro 1','Parceiro 2'],
   online: true, configured: false
 };
@@ -931,7 +1012,7 @@ async function sb(path, opts={}){
 async function loadAll(silent=false){
   if(!sbReady()){ setBanner('setup'); render(); return; }
   try{
-    const [cats, tx, rev, cfg, cards, cardTx, cardPay, goals, debts, wishes] = await Promise.all([
+    const [cats, tx, rev, cfg, cards, cardTx, cardPay, goals, debts, wishes, investments] = await Promise.all([
       sb('categories?select=*&order=created_at.asc'),
       sb('transactions?select=*&order=data.desc,created_at.desc&limit=500'),
       sb('revenues?select=*&order=created_at.asc'),
@@ -941,7 +1022,8 @@ async function loadAll(silent=false){
       sb('card_payments?select=*'),
       sb('goals?select=*&order=data_limite.asc'),
       sb('debts?select=*&order=created_at.asc'),
-      sb('wishes?select=*&order=created_at.desc')
+      sb('wishes?select=*&order=created_at.desc'),
+      sb('investments?select=*&order=created_at.desc')
     ]);
     S.cats = (cats||[]).map(c=>({...c, subs:Array.isArray(c.subs)?c.subs:[], limit:Number(c.limit_value)||0}));
     S.tx = tx||[];
@@ -952,6 +1034,7 @@ async function loadAll(silent=false){
     S.goals = goals||[];
     S.debts = debts||[];
     S.wishes = wishes||[];
+    S.investments = investments||[];
     if(cfg && cfg[0]) S.names = [cfg[0].partner1, cfg[0].partner2];
     S.online = true; S.configured = true;
     setBanner('');
@@ -1017,6 +1100,7 @@ function renderView(v){
   if(v==='goals') renderGoals();
   if(v==='debts') renderDebts();
   if(v==='wishes') renderWishes();
+  if(v==='invest') renderInvest();
   if(v==='categories') renderCats();
   if(v==='reports') setTimeout(renderReports, 40);
   if(v==='settings') renderSettings();
@@ -2052,6 +2136,371 @@ async function delWish(id){
     await sb(`wishes?id=eq.${id}`,{method:'DELETE'});
     await loadAll(true);
   }catch(e){ console.error(e); toast('Erro ao remover. Tente novamente.','err'); }
+}
+
+/* ============================================================
+   INVESTIMENTOS - SIMULADOR
+   Taxas de referencia (% ao ano) - editaveis pelo usuario
+   ============================================================ */
+const INV_INFO={
+  selic:{nome:'Tesouro Selic',taxa:14.9,ir:true,desc:'O investimento mais seguro do Brasil. Rende perto da taxa Selic e tem liquidez diaria (o resgate cai em 1 dia util). Ideal para reserva de emergencia.'},
+  ipca:{nome:'Tesouro IPCA+',taxa:12.0,ir:true,desc:'Rende a inflacao (IPCA) mais uma taxa fixa, protegendo o poder de compra. Ideal para longo prazo; evite resgatar antes do vencimento.'},
+  cdb:{nome:'CDB',taxa:14.9,ir:true,desc:'Voce empresta dinheiro ao banco e recebe juros (em geral perto de 100% do CDI). Protegido pelo FGC ate R$ 250 mil por CPF por instituicao.'},
+  lci:{nome:'LCI',taxa:13.4,ir:false,desc:'Letra de credito imobiliario. Isenta de imposto de renda para pessoa fisica, mas costuma ter carencia (prazo minimo para resgatar).'},
+  lca:{nome:'LCA',taxa:13.4,ir:false,desc:'Letra de credito do agronegocio. Tambem isenta de IR, com funcionamento parecido com a LCI.'},
+  poupanca:{nome:'Poupanca',taxa:7.5,ir:false,desc:'Isenta de IR e simples de usar, mas historicamente rende menos que as demais opcoes de renda fixa.'}
+};
+function irAliquota(dias){ return dias<=180?22.5:dias<=360?20:dias<=720?17.5:15; }
+
+function fillInvRate(force){
+  const tipo=document.getElementById('invTipo').value;
+  const el=document.getElementById('invTaxa');
+  if(force || !el.value) el.value=INV_INFO[tipo].taxa;
+  calcInvest();
+}
+
+function calcInvest(){
+  const tipo=document.getElementById('invTipo').value;
+  const info=INV_INFO[tipo];
+  const p0=parseFloat(document.getElementById('invInicial').value)||0;
+  const pm=parseFloat(document.getElementById('invMensal').value)||0;
+  const n=Math.max(parseInt(document.getElementById('invPrazo').value)||1,1);
+  const taxa=parseFloat(document.getElementById('invTaxa').value)||0;
+  const i=Math.pow(1+taxa/100,1/12)-1;
+
+  const serie=[];
+  let saldo=p0, investido=p0;
+  serie.push({saldo,investido});
+  for(let k=1;k<=n;k++){
+    saldo=saldo*(1+i)+pm;
+    investido+=pm;
+    serie.push({saldo,investido});
+  }
+  const bruto=saldo, rend=Math.max(bruto-investido,0);
+  const dias=n*30;
+  const aliq=info.ir?irAliquota(dias):0;
+  const irVal=rend*aliq/100;
+  const liquido=bruto-irVal;
+
+  document.getElementById('invResult').innerHTML=`
+    <div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">${escHtml(info.desc)}</div>
+    <div style="display:flex;flex-direction:column;gap:7px;font-size:13px;">
+      <div style="display:flex;justify-content:space-between;gap:8px;"><span>Total investido</span><b>${fmt(investido)}</b></div>
+      <div style="display:flex;justify-content:space-between;gap:8px;"><span>Rendimento bruto</span><b style="color:var(--green);">+${fmt(rend)}</b></div>
+      <div style="display:flex;justify-content:space-between;gap:8px;"><span>${info.ir?`IR (${aliq}% sobre o rendimento)`:'Imposto de renda'}</span><b style="color:${info.ir?'var(--red)':'var(--green)'};">${info.ir?'-'+fmt(irVal):'Isento'}</b></div>
+      <div style="display:flex;justify-content:space-between;gap:8px;border-top:1px solid var(--border);padding-top:9px;"><span><b>Valor final liquido</b></span><b style="font-size:16px;color:var(--green);">${fmt(liquido)}</b></div>
+    </div>
+    ${info.ir?'<div style="font-size:10px;color:var(--text-3);margin-top:10px;">Tabela regressiva do IR: ate 180 dias 22,5% · 181 a 360 dias 20% · 361 a 720 dias 17,5% · acima de 720 dias 15% (sempre sobre o rendimento, nunca sobre o total).</div>':''}
+  `;
+  drawInvChart(serie);
+}
+
+function drawInvChart(serie){
+  const canvas=document.getElementById('invChart'); if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.parentElement.clientWidth-32||320, H=210;
+  canvas.width=W; canvas.height=H; ctx.clearRect(0,0,W,H);
+  const maxV=Math.max(...serie.map(s=>s.saldo),1);
+  const pad={t:12,r:12,b:28,l:56};
+  const cW=W-pad.l-pad.r, cH=H-pad.t-pad.b;
+
+  ctx.strokeStyle=cssVar('--border'); ctx.lineWidth=.7;
+  for(let g=0;g<=4;g++){
+    const y=pad.t+(cH/4)*g;
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(W-pad.r,y); ctx.stroke();
+    const v=maxV-(maxV/4)*g;
+    ctx.fillStyle=cssVar('--text-3'); ctx.font='9px Inter,sans-serif'; ctx.textAlign='right';
+    ctx.fillText(fmt(v).replace('R$\u00a0','R$').slice(0,9),pad.l-4,y+3);
+  }
+  const step=Math.max(1,Math.round((serie.length-1)/6));
+  for(let k=0;k<serie.length;k+=step){
+    const x=pad.l+(k/(serie.length-1))*cW;
+    ctx.fillStyle=cssVar('--text-3'); ctx.font='9px Inter,sans-serif'; ctx.textAlign='center';
+    ctx.fillText(k+'m',x,H-pad.b+14);
+  }
+  function line(key,color){
+    ctx.beginPath(); ctx.strokeStyle=color; ctx.lineWidth=2.5; ctx.lineJoin='round';
+    serie.forEach((s,k)=>{
+      const x=pad.l+(k/(serie.length-1))*cW, y=pad.t+cH-(s[key]/maxV)*cH;
+      if(k===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+  }
+  line('investido','#3B82F6');
+  line('saldo',cssVar('--green')||'#4CAF7D');
+}
+
+function renderInvList(){
+  document.getElementById('invList').innerHTML = S.investments.length===0
+    ? '<div style="color:var(--text-3);font-size:12px;">Nenhuma simulacao salva. Calcule uma projecao e toque em "Salvar simulacao".</div>'
+    : S.investments.map(v=>{
+        const info=INV_INFO[v.tipo]||{nome:v.tipo};
+        return `<div class="tx-item">
+          <div class="tx-info">
+            <div class="tx-desc">${escHtml(info.nome)}</div>
+            <div class="tx-meta">${fmt(v.aporte_inicial)} inicial + ${fmt(v.aporte_mensal)}/mes · ${v.prazo_meses} meses · ${Number(v.taxa_aa)}% a.a.</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="loadInvestment('${v.id}')">Abrir</button>
+          <button class="tx-del" onclick="delInvestment('${v.id}')" aria-label="Remover">&#10005;</button>
+        </div>`;
+      }).join('');
+}
+
+async function saveInvestment(){
+  if(!canWrite()) return;
+  try{
+    await sb('investments',{method:'POST',body:JSON.stringify({
+      tipo:document.getElementById('invTipo').value,
+      aporte_inicial:parseFloat(document.getElementById('invInicial').value)||0,
+      aporte_mensal:parseFloat(document.getElementById('invMensal').value)||0,
+      prazo_meses:Math.max(parseInt(document.getElementById('invPrazo').value)||1,1),
+      taxa_aa:parseFloat(document.getElementById('invTaxa').value)||0
+    })});
+    toast('Simulacao salva!','ok');
+    await loadAll(true);
+  }catch(e){ console.error(e); toast('Erro ao gravar. Tente novamente.','err'); }
+}
+
+function loadInvestment(id){
+  const v=S.investments.find(x=>x.id===id); if(!v)return;
+  document.getElementById('invTipo').value=v.tipo;
+  document.getElementById('invInicial').value=v.aporte_inicial;
+  document.getElementById('invMensal').value=v.aporte_mensal;
+  document.getElementById('invPrazo').value=v.prazo_meses;
+  document.getElementById('invTaxa').value=v.taxa_aa;
+  switchInvTab('sim');
+  window.scrollTo(0,0);
+}
+
+async function delInvestment(id){
+  if(!canWrite()) return;
+  if(!confirm('Remover esta simulacao?'))return;
+  try{
+    await sb(`investments?id=eq.${id}`,{method:'DELETE'});
+    await loadAll(true);
+  }catch(e){ console.error(e); toast('Erro ao remover. Tente novamente.','err'); }
+}
+
+function switchInvTab(tab){
+  document.getElementById('invSim').style.display = tab==='sim'?'':'none';
+  document.getElementById('invFin').style.display = tab==='fin'?'':'none';
+  document.getElementById('stSim').classList.toggle('active',tab==='sim');
+  document.getElementById('stFin').classList.toggle('active',tab==='fin');
+  if(tab==='sim') calcInvest();
+  if(tab==='fin') renderFinChat();
+}
+
+function renderInvest(){
+  fillInvRate(false);
+  renderInvList();
+  renderFinChat();
+}
+
+/* ============================================================
+   ASSESSOR FIN - chat com IA
+   ============================================================ */
+const FIN_SYSTEM=`<papel>
+Voce e o Assessor Financeiro do casal dentro do app "Financa a Dois".
+Seu nome e Fin. Voce atua como um assessor de investimentos pessoal,
+especializado em educacao financeira para iniciantes e planejamento
+de longo prazo para casais.
+
+Voce NAO e um robo de investimentos autonomo. Voce e um guia educativo
+e estrategico que orienta, explica, e recomenda — mas a decisao final
+e SEMPRE do casal.
+
+Importante: voce nao e um consultor financeiro certificado (CVM/CFA).
+Deixe isso claro quando fizer recomendacoes, orientando o casal a
+validar decisoes relevantes com um profissional habilitado se necessario.
+</papel>
+
+<perfil_do_casal>
+  <pessoa nome="Bia">
+    - Regime: CLT
+    - Salario bruto: R$ 10.000/mes
+    - Salario liquido estimado: ~R$ 7.800 (considerar INSS + IRRF)
+  </pessoa>
+  <pessoa nome="Kaik">
+    - Regime: CLT
+    - Salario bruto: R$ 5.000/mes
+    - Salario liquido estimado: ~R$ 4.100 (considerar INSS + IRRF)
+  </pessoa>
+  <perfil_investidor>
+    - Classificacao: CONSERVADOR
+    - Nivel de conhecimento: INICIANTE (zero experiencia previa)
+    - Reserva de emergencia: NAO POSSUEM AINDA (prioridade #1)
+    - Capacidade de aporte mensal inicial: ate R$ 500
+    - Renda liquida combinada estimada: ~R$ 11.900/mes
+  </perfil_investidor>
+</perfil_do_casal>
+
+<dados_financeiros>
+Voce tem acesso ao historico financeiro do casal registrado no app.
+A cada interacao, os dados de receitas, despesas, categorias e saldos
+serao fornecidos no campo {{historico_financeiro}} da mensagem.
+
+Use esses dados para:
+1. Entender o padrao real de gastos do casal (nao apenas o que dizem)
+2. Identificar oportunidades de economia
+3. Calcular a capacidade real de aporte (receita - despesas fixas - variaveis)
+4. Ajustar recomendacoes ao momento financeiro atual
+5. Alertar sobre meses atipicos ou gastos fora do padrao
+6. Acompanhar a evolucao mes a mes e celebrar conquistas
+
+NUNCA invente dados. Se nao tiver o historico disponivel, peca ao casal
+para registrar no app antes de fazer recomendacoes especificas.
+</dados_financeiros>
+
+<metodologia>
+  <fase_1 nome="Diagnostico e Reserva de Emergencia" prioridade="MAXIMA">
+    Antes de qualquer investimento, o casal PRECISA de reserva de emergencia.
+    Meta: 6x despesas mensais fixas do casal em aplicacao de liquidez diaria.
+    Produtos adequados para reserva (perfil conservador):
+    - Tesouro Selic (resgate em D+1, sem IOF apos 30 dias)
+    - CDB de liquidez diaria (bancos solidos, rendimento >= 100% CDI)
+    - Fundo DI com taxa zero ou muito baixa
+    Passos:
+    1. Analisar os dados do app para calcular despesas fixas mensais
+    2. Definir o valor-alvo da reserva (6x despesas fixas)
+    3. Criar plano de aportes mensais ate atingir a meta
+    4. So apos a reserva completa, avancar para Fase 2
+  </fase_1>
+  <fase_2 nome="Primeiros Investimentos Conservadores">
+    Apos reserva formada, direcionar aportes para:
+    Renda Fixa (foco principal para perfil conservador):
+    - Tesouro Direto (Selic, IPCA+, Prefixado) — explicar cada um
+    - CDBs de bancos medios (cobertos pelo FGC ate R$ 250 mil)
+    - LCI/LCA (isentos de IR para pessoa fisica)
+    - Debentures incentivadas (isentas de IR, para prazos maiores)
+    Regras:
+    - Diversificar entre prazos e indexadores
+    - Nunca concentrar mais de R$ 200 mil por CPF por instituicao (FGC)
+    - Explicar a tributacao regressiva do IR (22,5% a 15%)
+    - Considerar o objetivo de cada valor investido (curto/medio/longo prazo)
+  </fase_2>
+  <fase_3 nome="Diversificacao Gradual (quando o casal estiver pronto)">
+    So introduzir quando:
+    - Reserva de emergencia esta completa
+    - Casal ja tem pelo menos 6 meses de experiencia com renda fixa
+    - Casal demonstra interesse e conforto para aprender mais
+    Opcoes graduais:
+    - Fundos multimercado conservadores
+    - Fundos imobiliarios (FIIs) — renda passiva mensal
+    - ETFs de renda fixa ou amplo mercado
+    - Pequena exposicao a renda variavel (maximo 10-15% do total)
+  </fase_3>
+</metodologia>
+
+<regras_de_conduta>
+  <comunicacao>
+    - Use linguagem SIMPLES e ACESSIVEL — o casal e iniciante
+    - Evite jargoes sem explicacao. Se usar um termo tecnico, explique entre parenteses
+    - Use analogias do dia a dia para explicar conceitos
+    - Seja direto e objetivo, mas acolhedor
+    - Trate ambos pelo nome (Kaik e Bia) para criar proximidade
+    - Quando um conceito for complexo, quebre em passos numerados
+    - Use exemplos com os valores reais do casal sempre que possivel
+    - Responda em portugues brasileiro
+  </comunicacao>
+  <seguranca>
+    - NUNCA recomende investimentos de alto risco para perfil conservador
+    - NUNCA recomende criptomoedas, day trade, opcoes ou derivativos
+    - NUNCA sugira investimentos sem explicar os riscos envolvidos
+    - NUNCA prometa rentabilidade. Use sempre "rentabilidade estimada" ou "historicamente"
+    - SEMPRE mencione: liquidez, risco, tributacao e prazo ao recomendar qualquer produto
+    - SEMPRE alerte sobre golpes financeiros comuns (piramides, retorno garantido, etc.)
+    - Se o casal perguntar sobre algo fora do perfil conservador, explique os riscos com clareza e reforce o perfil deles
+    - NUNCA peca dados bancarios, senhas ou informacoes sensiveis
+  </seguranca>
+  <personalizacao>
+    - Analise os dados do app ANTES de fazer qualquer recomendacao
+    - Adapte o valor sugerido de aporte a realidade financeira atual
+    - Se os gastos do mes foram altos, sugira um aporte menor — sem culpa
+    - Celebre marcos: "A reserva chegou a 50%!", "Primeiro mes de rendimento!"
+    - Lembre o casal de metas anteriores e acompanhe o progresso
+    - Considere sazonalidade (13o, ferias, IPVA, IPTU, volta as aulas)
+    - Se identificar um mes apertado, priorize orientacao de fluxo de caixa antes de investimentos
+  </personalizacao>
+  <analise_de_mercado>
+    Quando o casal pedir recomendacoes de produtos especificos:
+    1. Use taxas de referencia atuais (Selic, IPCA, CDI) com a ressalva de que podem ter mudado
+    2. Compare pelo menos 3 opcoes viaveis
+    3. Apresente em formato claro: nome, rentabilidade esperada, prazo, risco, liquidez, tributacao
+    4. De sua recomendacao com justificativa, mas reforce que a decisao e do casal
+    5. Sempre considere o cenario macroeconomico ao contextualizar
+  </analise_de_mercado>
+</regras_de_conduta>
+
+<fluxo_de_primeira_interacao>
+Na primeira conversa sobre investimentos, siga esta ordem:
+1. APRESENTE-SE brevemente como o Fin, assessor financeiro do casal
+2. VALIDE o perfil: confirme dados, pergunte sobre dividas existentes, metas de curto/medio/longo prazo, e se ha algum plano especifico (casa, carro, filhos, viagem)
+3. ANALISE os dados do app para entender o momento financeiro
+4. EDUQUE sobre o conceito de reserva de emergencia e por que ela vem primeiro
+5. PROPONHA um plano concreto com valores, prazos e proximos passos
+6. PERGUNTE se tem duvidas antes de avancar
+Nao despeje tudo de uma vez. Va em etapas, uma mensagem por vez,
+como uma conversa natural.
+</fluxo_de_primeira_interacao>
+
+<formato_de_resposta>
+- Respostas curtas e conversacionais (maximo 3-4 paragrafos por mensagem)
+- Nao use markdown (nada de asteriscos ou cerquilhas), apenas texto puro
+- Use listas apenas quando comparar produtos ou listar passos
+- Quando fizer calculos, mostre o raciocinio de forma simples
+- Termine sempre com uma pergunta ou proximo passo claro
+- Se o casal fizer uma pergunta fora do escopo financeiro, redirecione gentilmente
+</formato_de_resposta>`;
+
+let finMsgs=[];
+const FIN_GREET='Oi! Eu sou o Fin, o assessor financeiro de voces dois. Posso analisar os registros do app, montar o plano da reserva de emergencia e explicar investimentos do zero, sem economes. Por onde querem comecar?';
+
+function renderFinChat(typing=false){
+  const box=document.getElementById('finChat'); if(!box)return;
+  let html=`<div class="msg fin">${escHtml(FIN_GREET)}</div>`;
+  html+=finMsgs.map(m=>`<div class="msg ${m.role==='user'?'user':'fin'}">${escHtml(m.show)}</div>`).join('');
+  if(typing) html+='<div class="msg fin typing">Fin esta digitando...</div>';
+  box.innerHTML=html;
+  box.scrollTop=box.scrollHeight;
+}
+
+async function sendFin(){
+  const inp=document.getElementById('finInput');
+  const text=inp.value.trim();
+  if(!text) return;
+  if(!CFG.apiKey){ toast('Configure a chave da API Anthropic em Configuracoes','err'); return; }
+  const btn=document.getElementById('finBtn');
+  inp.value=''; btn.disabled=true;
+  finMsgs.push({role:'user', show:text, api:`{{historico_financeiro}}: ${finSnapshot()}\n\nPergunta: ${text}`});
+  renderFinChat(true);
+  try{
+    const r=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true',
+        'x-api-key': CFG.apiKey
+      },
+      body: JSON.stringify({
+        model:'claude-haiku-4-5-20251001',
+        max_tokens:1024,
+        system:FIN_SYSTEM,
+        messages:finMsgs.map(m=>({role:m.role,content:m.api}))
+      })
+    });
+    const data=await r.json();
+    if(data.error) throw new Error(data.error.message||'api error');
+    const reply=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join(' ').trim();
+    finMsgs.push({role:'assistant', show:reply, api:reply});
+    renderFinChat();
+  }catch(e){
+    console.error(e);
+    finMsgs.pop();
+    inp.value=text;
+    renderFinChat();
+    toast('Erro ao falar com o Fin. Verifique a chave da API e tente de novo.','err');
+  }finally{ btn.disabled=false; }
 }
 
 /* ============================================================
