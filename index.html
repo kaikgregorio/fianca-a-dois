@@ -419,7 +419,7 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
     </div>
     <div class="g2">
       <div class="card"><div class="card-label">Faturas dos cartoes</div><div id="dashCards"></div></div>
-      <div class="card"><div class="card-label">Ultimos lancamentos</div><div id="recentTx"></div></div>
+      <div class="card"><div class="card-label">Ultimos lancamentos</div><div id="recentTx" style="max-height:380px;overflow-y:auto;padding-right:2px;"></div></div>
     </div>
   </div>
 
@@ -428,7 +428,7 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
     <div class="header-row">
       <div><div class="page-title">Gastos</div><div class="page-sub">todas as despesas registradas</div></div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <select id="txFType" onchange="renderTx()" style="padding:8px 10px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;background:var(--white);min-height:38px;">
+        <select id="txFType" onchange="renderTx()" style="padding:8px 10px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;background:var(--white);color:var(--text-1);min-height:38px;">
           <option value="all">Todos</option>
           <option value="fixed">Fixas</option>
           <option value="variable">Variaveis</option>
@@ -1201,7 +1201,7 @@ Formato de resposta:
 - pessoa: "0" para ${pn(0)}, "1" para ${pn(1)}, "both" se nao especificado
 - tipo: "fixed" para despesa recorrente/fixa, "variable" para gasto pontual
 - categoria: use uma das categorias listadas
-- metodo: "credit" se mencionar cartao de credito, credito ou parcelamento; senao "pix"
+- metodo: "credit" se mencionar cartao de credito, credito ou parcelamento; "benefit" se mencionar vale refeicao, vale alimentacao, VR, VA, ifood beneficios ou cartao beneficio; senao "pix"
 - parcelas: numero de parcelas se mencionado (ex: "parcelei em 3x" = 3); senao 1
 - se valor nao identificado, use 0`;
 
@@ -1237,7 +1237,7 @@ Formato de resposta:
       data: parsed.data||today(),
       pessoa: parsed.pessoa||'both',
       tipo: parsed.tipo||'variable',
-      metodo: parsed.metodo==='credit'?'credit':'pix',
+      metodo: ['credit','benefit'].includes(parsed.metodo)?parsed.metodo:'pix',
       parcelas: Math.max(1, parseInt(parsed.parcelas)||1)
     };
     showConfirmModal(pending);
@@ -1302,7 +1302,7 @@ async function saveConfirm(){
   try{
     const metodo=document.getElementById('cfMetodo').value;
     let card_id=null;
-    if(metodo==='credit'){
+    if(metodo==='credit'||metodo==='benefit'){
       card_id=document.getElementById('cfCardSel').value||null;
       if(!card_id){toast('Escolha em qual cartao foi o gasto (cadastre um na aba Cartoes se preciso)','err');btn.disabled=false;return;}
     }
@@ -1413,8 +1413,8 @@ function renderDash(){
   const mRev=S.rev.filter(r=>r.recorrencia!=='once'||inMonth(r.data,mk));
 
   /* credito nao desconta do saldo: so pix/debito e faturas pagas contam */
-  const mTxCash=mTx.filter(t=>t.metodo!=='credit');
-  const credMes=S.cardTx.filter(t=>inMonth(t.data,mk)).reduce((s,t)=>s+Number(t.valor),0);
+  const mTxCash=mTx.filter(t=>t.metodo!=='credit'&&t.metodo!=='benefit');
+  const credMes=S.cardTx.filter(t=>inMonth(t.data,mk)&&cardTipo(S.cards.find(x=>x.id===t.card_id))==='credit').reduce((s,t)=>s+Number(t.valor),0);
   const totExp=mTxCash.reduce((s,t)=>s+Number(t.valor),0);
   const totRev=mRev.reduce((s,r)=>{
     const v=Number(r.valor);
@@ -1475,10 +1475,11 @@ function renderDash(){
   document.getElementById('catLimits').innerHTML=limHtml;
 
   /* formas de pagamento do mes */
-  const totPix=mTx.filter(t=>t.metodo!=='credit').reduce((s,t)=>s+Number(t.valor),0);
-  const totCred=S.cardTx.filter(t=>inMonth(t.data,mk)).reduce((s,t)=>s+Number(t.valor),0);
-  const totPm=Math.max(totPix+totCred,1);
-  document.getElementById('payMethods').innerHTML = (totPix+totCred)===0
+  const totPix=mTx.filter(t=>t.metodo!=='credit'&&t.metodo!=='benefit').reduce((s,t)=>s+Number(t.valor),0);
+  const totCred=S.cardTx.filter(t=>inMonth(t.data,mk)&&cardTipo(S.cards.find(x=>x.id===t.card_id))==='credit').reduce((s,t)=>s+Number(t.valor),0);
+  const totBen=S.cardTx.filter(t=>inMonth(t.data,mk)&&cardTipo(S.cards.find(x=>x.id===t.card_id))==='benefit').reduce((s,t)=>s+Number(t.valor),0);
+  const totPm=Math.max(totPix+totCred+totBen,1);
+  document.getElementById('payMethods').innerHTML = (totPix+totCred+totBen)===0
     ? '<div style="color:var(--text-3);font-size:12px;">Nenhum gasto registrado neste mes.</div>'
     : `<div class="p-bar">
         <div class="p-name">Pix/Debito</div>
@@ -1490,12 +1491,17 @@ function renderDash(){
         <div class="p-track"><div class="p-fill" style="width:${(totCred/totPm*100).toFixed(0)}%;background:#8B5CF6;"></div></div>
         <div class="p-amt">${fmt(totCred)}</div>
       </div>
+      ${totBen>0?`<div class="p-bar">
+        <div class="p-name">Beneficio</div>
+        <div class="p-track"><div class="p-fill" style="width:${(totBen/totPm*100).toFixed(0)}%;background:#F59E0B;"></div></div>
+        <div class="p-amt">${fmt(totBen)}</div>
+      </div>`:''}
       <div style="font-size:11px;color:var(--text-3);margin-top:6px;">${((totCred/totPm)*100).toFixed(0)}% dos gastos do mes foram no credito</div>`;
 
   /* compras no cartao: parcelas organizadas pelo ciclo de fatura de cada cartao */
   const activeParc=S.cardTx.map(t=>{
     const card=S.cards.find(c=>c.id===t.card_id);
-    if(!card) return null;
+    if(!card||cardTipo(card)==='benefit') return null;
     const n=Math.max(1,Number(t.parcelas)||1);
     const firstYm=firstInvoiceYm(card,t.data);
     const openYm=currentOpenYm(card);
@@ -1528,9 +1534,7 @@ function renderDash(){
       </div>`;
       }).join('');
 
-  document.getElementById('dashCards').innerHTML = S.cards.length===0
-    ? '<div style="color:var(--text-3);font-size:12px;">Nenhum cartao cadastrado. Adicione em Cartoes.</div>'
-    : S.cards.map(c=>{
+  const dashCredit=S.cards.filter(c=>cardTipo(c)==='credit').map(c=>{
         const ymOpen=currentOpenYm(c);
         const val=invoiceValue(c,ymOpen);
         return `<div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--border);">
@@ -1540,8 +1544,18 @@ function renderDash(){
           <span style="font-size:13px;font-weight:700;">${fmt(val)}</span>
         </div>`;
       }).join('');
+  const dashBens=S.cards.filter(c=>cardTipo(c)==='benefit'&&c.show_dash!==false).map(c=>{
+        const b=benefitBalance(c);
+        return `<div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--border);">
+          <span style="width:10px;height:10px;border-radius:3px;background:${c.color};flex-shrink:0;"></span>
+          <span style="flex:1;font-size:13px;font-weight:500;">${escHtml(c.name)}</span>
+          <span style="font-size:11px;color:var(--text-3);">saldo do mes</span>
+          <span style="font-size:13px;font-weight:700;color:${b.saldo>=0.005?'var(--green)':'var(--red)'};">${fmt(b.saldo)}</span>
+        </div>`;
+      }).join('');
+  document.getElementById('dashCards').innerHTML = (dashCredit+dashBens) || '<div style="color:var(--text-3);font-size:12px;">Nenhum cartao cadastrado. Adicione em Cartoes.</div>';
 
-  const rec=S.tx.slice(0,8);
+  const rec=S.tx;
   document.getElementById('recentTx').innerHTML = rec.length===0
     ? '<div class="empty">Nenhum lancamento ainda. Use o campo acima para registrar o primeiro.</div>'
     : rec.map(t=>{ const c=catById(t.cat_id); return `
@@ -1561,7 +1575,7 @@ function renderDash(){
     if(p>=80) return `<div class="alert alert-amber">${escHtml(c.name)}: ${p.toFixed(0)}% do limite estipulado — ${fmt(sp)} de ${fmt(c.limit)}.</div>`;
     return '';
   }).join('');
-  const cardAlerts=S.cards.map(c=>{
+  const cardAlerts=S.cards.filter(c=>cardTipo(c)==='credit').map(c=>{
     let out='';
     if(closesTomorrow(c)){
       const v=invoiceValue(c,currentOpenYm(c));
@@ -1602,7 +1616,7 @@ function renderTx(){
         const c=catById(t.cat_id);
         const per=t.pessoa==='both'?'Ambos':pn(Number(t.pessoa));
         const nParc=Math.max(1,Number(t.parcelas)||1);
-        const met=(t.metodo==='credit') ? `Credito${nParc>1?' '+nParc+'x':''}` : 'Pix/Debito';
+        const met=(t.metodo==='credit') ? `Credito${nParc>1?' '+nParc+'x':''}` : (t.metodo==='benefit' ? 'Beneficio' : 'Pix/Debito');
         return `<div class="tx-item">
           <div class="tx-dot" style="background:${c.color};"></div>
           <div class="tx-info">
@@ -1688,7 +1702,6 @@ function openTxModal(id){
   const t = id ? S.tx.find(x=>x.id===id) : null;
   populateCatSelect('mTxCat');
   populatePersonSelect('mTxPerson');
-  populateCardSelect('mTxCardSel');
   document.getElementById('mTxTitle').textContent = t ? 'Editar gasto' : 'Adicionar gasto';
   document.getElementById('mTxId').value = t ? t.id : '';
   document.getElementById('mTxDesc').value = t ? t.descricao : '';
@@ -1701,15 +1714,15 @@ function openTxModal(id){
   document.getElementById('mTxType').value = t ? t.tipo : 'variable';
   document.getElementById('mTxMetodo').value = t ? (t.metodo||'pix') : 'pix';
   document.getElementById('mTxParc').value = t ? String(t.parcelas||1) : '1';
-  if(t && t.card_id) document.getElementById('mTxCardSel').value = t.card_id;
   onMetodoChange('mTx');
+  if(t && t.card_id) document.getElementById('mTxCardSel').value = t.card_id;
   openM('modalTx');
 }
 
 /* mantem o espelho do gasto de credito na aba de cartoes */
 async function syncCardMirror(tx){
   const mirror=S.cardTx.find(ct=>ct.tx_id===tx.id);
-  if(tx.metodo==='credit' && tx.card_id){
+  if((tx.metodo==='credit'||tx.metodo==='benefit') && tx.card_id){
     const body={card_id:tx.card_id, descricao:tx.descricao, valor:tx.valor, parcelas:tx.parcelas||1, data:tx.data, tx_id:tx.id};
     if(mirror) await sb(`card_transactions?id=eq.${mirror.id}`,{method:'PATCH',body:JSON.stringify(body)});
     else await sb('card_transactions',{method:'POST',body:JSON.stringify(body)});
@@ -1726,7 +1739,7 @@ async function saveTx(){
   if(!desc||!val){toast('Preencha descricao e valor','err');return;}
   const metodo=document.getElementById('mTxMetodo').value;
   let card_id=null;
-  if(metodo==='credit'){
+  if(metodo==='credit'||metodo==='benefit'){
     card_id=document.getElementById('mTxCardSel').value||null;
     if(!card_id){toast('Escolha em qual cartao foi o gasto (cadastre um na aba Cartoes se preciso)','err');return;}
   }
@@ -1810,9 +1823,11 @@ async function saveRev(){
    CARTOES DE CREDITO - VIEW
    ============================================================ */
 function renderCards(){
-  document.getElementById('ccList').innerHTML = S.cards.length===0
-    ? '<div class="empty">Nenhum cartao cadastrado. Toque em "+ Novo cartao" para comecar.</div>'
-    : S.cards.map(c=>{
+  const creditCards=S.cards.filter(c=>cardTipo(c)==='credit');
+  const benefitCards=S.cards.filter(c=>cardTipo(c)==='benefit');
+  const creditHtml = creditCards.length===0
+    ? '<div style="color:var(--text-3);font-size:12px;margin-bottom:6px;">Nenhum cartao de credito cadastrado.</div>'
+    : creditCards.map(c=>{
         const ymOpen=currentOpenYm(c);
         const ymClosed=ymOpen-1;
         const openVal=invoiceValue(c,ymOpen);
@@ -1872,6 +1887,73 @@ function renderCards(){
           </div>
         </div>`;
       }).join('');
+
+  const benefitHtml = benefitCards.length===0
+    ? '<div style="color:var(--text-3);font-size:12px;">Nenhum cartao beneficio (VR/VA). Crie em "+ Novo cartao" escolhendo o tipo Beneficio.</div>'
+    : benefitCards.map(c=>{
+        const b=benefitBalance(c);
+        const pct=b.total>0?Math.min(100,Math.max(b.gasto/b.total*100,0)):0;
+        const recent=S.cardTx.filter(t=>t.card_id===c.id).slice(0,5);
+        return `<div class="cc-card">
+          <div class="cc-band" style="background:${c.color};"></div>
+          <div class="cc-body">
+            <div class="cc-head">
+              <div class="cc-name">${escHtml(c.name)}</div>
+              <div style="display:flex;gap:6px;">
+                <button class="btn btn-secondary btn-sm" onclick="openCardModal('${c.id}')">Editar</button>
+                <button class="btn btn-secondary btn-sm" onclick="delCard('${c.id}')">&#10005;</button>
+              </div>
+            </div>
+            <div class="cc-invoice">
+              <div>
+                <div class="cc-inv-label">Saldo de ${monthLabel(monthKey())}</div>
+                <div class="cc-inv-val" style="color:${b.saldo>=0.005?'var(--green)':'var(--red)'};">${fmt(b.saldo)}</div>
+              </div>
+              <div style="font-size:11px;color:var(--text-2);text-align:right;">entra ${fmt(b.total)}/mes<br>gasto ${fmt(b.gasto)}</div>
+            </div>
+            <div class="prog-track" style="margin:2px 0 12px;"><div class="prog-fill" style="width:${pct.toFixed(0)}%;background:${pct>=90?'var(--red)':c.color};"></div></div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-2);margin-bottom:10px;cursor:pointer;">
+              <input type="checkbox" ${c.show_dash!==false?'checked':''} onchange="toggleCardDash('${c.id}',this.checked)" style="width:16px;height:16px;accent-color:var(--green);">
+              Mostrar saldo no painel
+            </label>
+            <div class="cc-actions">
+              <button class="btn btn-primary btn-sm" onclick="openCcTxModal('${c.id}')">+ Compra</button>
+            </div>
+            ${recent.length>0?`
+            <div style="margin-top:12px;">
+              <div style="font-size:10px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Ultimas compras</div>
+              ${recent.map(t=>`<div class="tx-item">
+                  <div class="tx-info">
+                    <div class="tx-desc">${escHtml(t.descricao)}</div>
+                    <div class="tx-meta">${fmtDate(t.data)}</div>
+                  </div>
+                  <div class="tx-amount">-${fmt(t.valor)}</div>
+                  <button class="tx-del" onclick="delCcTx('${t.id}')" aria-label="Remover">&#10005;</button>
+                </div>`).join('')}
+            </div>`:''}
+          </div>
+        </div>`;
+      }).join('');
+
+  document.getElementById('ccList').innerHTML =
+    `<div class="card-label" style="margin:2px 0 10px;">Cartoes de credito</div>`+creditHtml+
+    `<div class="card-label" style="margin:20px 0 10px;">Cartoes beneficio</div>`+benefitHtml;
+}
+
+async function toggleCardDash(id, show){
+  if(!canWrite()){ renderCards(); return; }
+  try{
+    await sb(`cards?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({show_dash:show})});
+    const c=S.cards.find(x=>x.id===id); if(c) c.show_dash=show;
+    renderCards();
+    toast(show?'Saldo visivel no painel':'Saldo oculto do painel','ok');
+  }catch(e){ console.error(e); toast('Erro ao gravar. Tente novamente.','err'); }
+}
+
+function onCardTipoChange(){
+  const ben=document.getElementById('mCardTipo').value==='benefit';
+  document.getElementById('cardCreditFields').style.display=ben?'none':'';
+  document.getElementById('cardBenefitFields').style.display=ben?'':'none';
 }
 
 function openCardModal(id){
@@ -1883,6 +1965,9 @@ function openCardModal(id){
   document.getElementById('mCardExtra').value = c ? (Number(c.extra)||'') : '';
   document.getElementById('mCardClose').value = c ? c.close_day : '';
   document.getElementById('mCardDue').value = c ? c.due_day : '';
+  document.getElementById('mCardTipo').value = c ? cardTipo(c) : 'credit';
+  document.getElementById('mCardBenVal').value = c ? (Number(c.benefit_value)||'') : '';
+  onCardTipoChange();
   openM('modalCard');
 }
 
@@ -1890,15 +1975,18 @@ async function saveCard(){
   if(!canWrite()) return;
   const id=document.getElementById('mCardId').value;
   const name=document.getElementById('mCardName').value.trim();
-  const close_day=parseInt(document.getElementById('mCardClose').value)||0;
-  const due_day=parseInt(document.getElementById('mCardDue').value)||0;
-  if(!name||!close_day||!due_day){toast('Preencha nome, fechamento e vencimento','err');return;}
-  const body={
-    name,
-    color:document.getElementById('mCardColor').value,
-    extra:parseFloat(document.getElementById('mCardExtra').value)||0,
-    close_day, due_day
-  };
+  const tipo=document.getElementById('mCardTipo').value;
+  if(!name){toast('Informe o nome do cartao','err');return;}
+  const body={ name, tipo, color:document.getElementById('mCardColor').value };
+  if(tipo==='benefit'){
+    body.benefit_value=parseFloat(document.getElementById('mCardBenVal').value)||0;
+  } else {
+    const close_day=parseInt(document.getElementById('mCardClose').value)||0;
+    const due_day=parseInt(document.getElementById('mCardDue').value)||0;
+    if(!close_day||!due_day){toast('Preencha fechamento e vencimento','err');return;}
+    body.extra=parseFloat(document.getElementById('mCardExtra').value)||0;
+    body.close_day=close_day; body.due_day=due_day;
+  }
   try{
     if(id) await sb(`cards?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(body)});
     else await sb('cards',{method:'POST',body:JSON.stringify(body)});
@@ -1919,6 +2007,7 @@ async function delCard(id){
 function openCcTxModal(cardId){
   const c=S.cards.find(x=>x.id===cardId);
   document.getElementById('mCcTxTitle').textContent=`Compra no ${c?c.name:'cartao'}`;
+  document.getElementById('mCcTxParcWrap').style.display = (c&&cardTipo(c)==='benefit') ? 'none' : '';
   document.getElementById('mCcTxCardId').value=cardId;
   document.getElementById('mCcTxDesc').value='';
   document.getElementById('mCcTxAmt').value='';
@@ -2698,10 +2787,10 @@ para registrar no app antes de fazer recomendacoes especificas.
 
 <regras_de_conduta>
   <comunicacao>
-    - Use linguagem SIMPLES e ACESSIVEL — o casal e iniciante
-    - Evite jargoes sem explicacao. Se usar um termo tecnico, explique entre parenteses
-    - Use analogias do dia a dia para explicar conceitos
-    - Seja direto e objetivo, mas acolhedor
+    - Tom PROFISSIONAL e objetivo, como um assessor de confianca: cordial, sem girias, sem informalidade excessiva e sem emojis
+    - Linguagem explicativa e simples — o casal e iniciante: explique termos tecnicos entre parenteses na primeira vez que aparecerem
+    - Sem enrolacao: va direto ao ponto, nao repita o que ja foi dito e nao encha a resposta de frases genericas
+    - Use analogias apenas quando realmente ajudarem a entender um conceito
     - Trate ambos pelo nome (Kaik e Bia) para criar proximidade
     - Quando um conceito for complexo, quebre em passos numerados
     - Use exemplos com os valores reais do casal sempre que possivel
@@ -2758,7 +2847,7 @@ como uma conversa natural.
 </formato_de_resposta>`;
 
 let finMsgs=[];
-const FIN_GREET='Oi! Eu sou o Fin, o assessor financeiro de voces dois. Posso analisar os registros do app, montar o plano da reserva de emergencia e explicar investimentos do zero, sem economes. Por onde querem comecar?';
+const FIN_GREET='Ola! Sou o Fin, assessor financeiro de voces. Posso analisar os registros do app, estruturar a reserva de emergencia e orientar os primeiros investimentos, explicando cada passo de forma simples. Por onde gostariam de comecar?';
 
 function renderFinChat(typing=false){
   const box=document.getElementById('finChat'); if(!box)return;
@@ -2825,7 +2914,6 @@ function renderCats(){
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0;">
         <button class="btn btn-secondary btn-sm" onclick="openCatModal('${c.id}')">Editar</button>
-        <button class="btn btn-secondary btn-sm" onclick="openLimitModal('${c.id}')">Limite</button>
         <button class="btn btn-secondary btn-sm" onclick="delCat('${c.id}')">&#10005;</button>
       </div>
     </div>`).join('')||'<div class="empty">Nenhuma categoria. Rode o script SQL no Supabase ou crie uma nova.</div>';
@@ -2965,7 +3053,7 @@ function monthLabel(mk){
 }
 function monthSnapshot(mk){
   const mTx=S.tx.filter(t=>inMonth(t.data,mk));
-  const cash=mTx.filter(t=>t.metodo!=='credit');
+  const cash=mTx.filter(t=>t.metodo!=='credit'&&t.metodo!=='benefit');
   const gastos=+cash.reduce((s,t)=>s+Number(t.valor),0).toFixed(2);
   const credito=+S.cardTx.filter(t=>inMonth(t.data,mk)).reduce((s,t)=>s+Number(t.valor),0).toFixed(2);
   const mRev=S.rev.filter(r=>r.recorrencia!=='once'||inMonth(r.data,mk));
