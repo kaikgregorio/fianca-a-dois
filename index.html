@@ -243,6 +243,9 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
    CATEGORY & CARTAO ROWS
    ============================================================ */
 .cat-row{display:flex;align-items:flex-start;gap:10px;padding:13px;background:var(--white);border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:8px;box-shadow:var(--shadow-sm);}
+.cat-row.dragging{opacity:.65;box-shadow:var(--shadow-md);border-color:var(--green);position:relative;z-index:5;}
+.drag-handle{touch-action:none;cursor:grab;color:var(--text-3);padding:4px 2px;margin:-2px 0 0 -4px;flex-shrink:0;display:flex;align-items:center;}
+.drag-handle:active{cursor:grabbing;color:var(--green);}
 .cat-dot{width:13px;height:13px;border-radius:50%;flex-shrink:0;margin-top:2px;}
 
 .cc-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:12px;box-shadow:var(--shadow-sm);overflow:hidden;}
@@ -412,7 +415,7 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
     </div>
     <div class="g2">
       <div class="card"><div class="card-label">Formas de pagamento (mes)</div><div id="payMethods"></div></div>
-      <div class="card"><div class="card-label">Compras parceladas</div><div id="installments"></div></div>
+      <div class="card"><div class="card-label">Compras no cartao</div><div id="installments"></div></div>
     </div>
     <div class="g2">
       <div class="card"><div class="card-label">Faturas dos cartoes</div><div id="dashCards"></div></div>
@@ -432,6 +435,14 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
         </select>
         <button class="btn btn-primary btn-sm" onclick="openTxModal()">+ Adicionar</button>
       </div>
+    </div>
+    <div class="card" style="margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">
+        <div class="card-label" style="margin-bottom:0;">Gastos recorrentes</div>
+        <button class="btn btn-primary btn-sm" onclick="openRecModal()">+ Recorrente</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:10px;">Lancados automaticamente todo mes no dia escolhido, como Pix/Debito fixo.</div>
+      <div id="recList"></div>
     </div>
     <div class="card" style="padding:6px 16px;"><div id="txList"></div></div>
   </div>
@@ -561,6 +572,10 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
   <!-- GRAFICOS -->
   <div class="view" id="view-reports">
     <div style="margin-bottom:16px;"><div class="page-title">Graficos</div><div class="page-sub">analise visual dos gastos</div></div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-label">Fechamento mensal do Fin</div>
+      <div id="monthlyReport"></div>
+    </div>
     <div class="g2">
       <div class="card">
         <div class="card-label">Gastos por categoria</div>
@@ -652,7 +667,7 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
     <div class="fg"><label>Descricao</label><input type="text" id="mTxDesc" placeholder="Ex: Supermercado"></div>
     <div class="frow">
       <div class="fg"><label>Valor (R$)</label><input type="number" id="mTxAmt" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
-      <div class="fg"><label>Data</label><input type="date" id="mTxDate"></div>
+      <div class="fg"><label>Data</label><input type="date" id="mTxDate" onchange="updateInvHint('mTx')"></div>
     </div>
     <div class="frow">
       <div class="fg"><label>Categoria</label><select id="mTxCat" onchange="updateSubs('mTxSub','mTxCat')"></select></div>
@@ -664,9 +679,10 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
     </div>
     <div class="frow">
       <div class="fg"><label>Metodo de pagamento</label>
-        <select id="mTxMetodo" onchange="toggleParcelas('mTxMetodo','mTxParcWrap')">
+        <select id="mTxMetodo" onchange="onMetodoChange('mTx')">
           <option value="pix">Pix / Debito</option>
           <option value="credit">Credito</option>
+          <option value="benefit">Cartao beneficio</option>
         </select>
       </div>
       <div class="fg" id="mTxParcWrap" style="display:none;"><label>Parcelas</label>
@@ -679,6 +695,10 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
           <option value="15">15x</option><option value="18">18x</option><option value="24">24x</option>
         </select>
       </div>
+    </div>
+    <div class="fg" id="mTxCardWrap" style="display:none;"><label>Em qual cartao?</label>
+      <select id="mTxCardSel" onchange="updateInvHint('mTx')"></select>
+      <div id="mTxInvHint" style="font-size:11px;color:var(--text-2);margin-top:6px;"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeM('modalTx')">Cancelar</button>
@@ -762,16 +782,31 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
     <div class="modal-grip"></div>
     <div class="modal-title" id="mCardTitle">Novo cartao</div>
     <input type="hidden" id="mCardId">
-    <div class="fg"><label>Nome do cartao</label><input type="text" id="mCardName" placeholder="Ex: Nubank"></div>
+    <div class="fg"><label>Nome do cartao</label><input type="text" id="mCardName" placeholder="Ex: Nubank, VR, iFood Beneficios"></div>
     <div class="frow">
+      <div class="fg"><label>Tipo</label>
+        <select id="mCardTipo" onchange="onCardTipoChange()">
+          <option value="credit">Cartao de credito</option>
+          <option value="benefit">Cartao beneficio (VR/VA)</option>
+        </select>
+      </div>
       <div class="fg"><label>Cor</label><input type="color" id="mCardColor" value="#8B5CF6"></div>
-      <div class="fg"><label>Fatura atual - ajuste (R$)</label><input type="number" id="mCardExtra" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
     </div>
-    <div class="frow">
-      <div class="fg"><label>Dia do fechamento</label><input type="number" id="mCardClose" placeholder="Ex: 3" min="1" max="31" inputmode="numeric"></div>
-      <div class="fg"><label>Dia do vencimento</label><input type="number" id="mCardDue" placeholder="Ex: 10" min="1" max="31" inputmode="numeric"></div>
+    <div id="cardCreditFields">
+      <div class="frow">
+        <div class="fg"><label>Fatura atual - ajuste (R$)</label><input type="number" id="mCardExtra" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
+        <div class="fg"><label>Dia do fechamento</label><input type="number" id="mCardClose" placeholder="Ex: 3" min="1" max="31" inputmode="numeric"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Dia do vencimento</label><input type="number" id="mCardDue" placeholder="Ex: 10" min="1" max="31" inputmode="numeric"></div>
+        <div></div>
+      </div>
+      <div class="alert alert-blue" style="font-size:11px;">O ajuste da fatura serve para lancar o valor que ja existia na fatura antes de comecar a usar o app. A melhor data de compra e calculada automaticamente (dia seguinte ao fechamento).</div>
     </div>
-    <div class="alert alert-blue" style="font-size:11px;">O ajuste da fatura serve para lancar o valor que ja existia na fatura antes de comecar a usar o app. A melhor data de compra e calculada automaticamente (dia seguinte ao fechamento).</div>
+    <div id="cardBenefitFields" style="display:none;">
+      <div class="fg"><label>Valor que entra por mes (R$)</label><input type="number" id="mCardBenVal" placeholder="Ex: 600,00" min="0" step="0.01" inputmode="decimal"></div>
+      <div class="alert alert-blue" style="font-size:11px;">Cartao beneficio nao tem fatura: as compras descontam do valor do mes, e nada disso mexe no saldo do app. O saldo restante aparece na aba Cartoes e, se voce quiser, tambem no painel.</div>
+    </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeM('modalCard')">Cancelar</button>
       <button class="btn btn-primary" onclick="saveCard()">Salvar</button>
@@ -790,9 +825,10 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
     <div class="fg"><label>Descricao</label><input type="text" id="mCcTxDesc" placeholder="Ex: Tenis novo"></div>
     <div class="frow">
       <div class="fg"><label>Valor total (R$)</label><input type="number" id="mCcTxAmt" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
-      <div class="fg"><label>Data da compra</label><input type="date" id="mCcTxDate"></div>
+      <div class="fg"><label>Data da compra</label><input type="date" id="mCcTxDate" onchange="updateCcTxHint()"></div>
     </div>
-    <div class="fg"><label>Parcelado em</label>
+    <div id="mCcTxInvHint" style="font-size:11px;color:var(--text-2);margin:-4px 0 12px;"></div>
+    <div class="fg" id="mCcTxParcWrap"><label>Parcelado em</label>
       <select id="mCcTxParc">
         <option value="1">A vista (1x)</option>
         <option value="2">2x</option><option value="3">3x</option><option value="4">4x</option>
@@ -908,6 +944,31 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
   </div>
 </div>
 
+<!-- ============================================================
+     MODAL: GASTO RECORRENTE
+     ============================================================ -->
+<div class="overlay" id="modalRec" style="display:none;">
+  <div class="modal">
+    <div class="modal-grip"></div>
+    <div class="modal-title" id="mRecTitle">Novo gasto recorrente</div>
+    <input type="hidden" id="mRecId">
+    <div class="fg"><label>Descricao</label><input type="text" id="mRecDesc" placeholder="Ex: Internet wifi, Racao Kiara"></div>
+    <div class="frow">
+      <div class="fg"><label>Valor (R$)</label><input type="number" id="mRecVal" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
+      <div class="fg"><label>Dia do mes</label><input type="number" id="mRecDia" placeholder="Ex: 5" min="1" max="31" inputmode="numeric"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Categoria</label><select id="mRecCat" onchange="updateSubs('mRecSub','mRecCat')"></select></div>
+      <div class="fg"><label>Subcategoria</label><select id="mRecSub"></select></div>
+    </div>
+    <div class="fg"><label>Pessoa</label><select id="mRecPerson"></select></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeM('modalRec')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveRec()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-wrap" id="toasts"></div>
 
 <script>
@@ -923,7 +984,7 @@ let S = {
   tx: [], rev: [], cats: [],
   cards: [], cardTx: [], cardPay: [],
   goals: [], debts: [], wishes: [],
-  investments: [],
+  investments: [], recs: [], reports: [],
   names: ['Parceiro 1','Parceiro 2'],
   online: true, configured: false
 };
@@ -1012,8 +1073,8 @@ async function sb(path, opts={}){
 async function loadAll(silent=false){
   if(!sbReady()){ setBanner('setup'); render(); return; }
   try{
-    const [cats, tx, rev, cfg, cards, cardTx, cardPay, goals, debts, wishes, investments] = await Promise.all([
-      sb('categories?select=*&order=created_at.asc'),
+    const [cats, tx, rev, cfg, cards, cardTx, cardPay, goals, debts, wishes, investments, recs, reports] = await Promise.all([
+      sb('categories?select=*&order=ordem.asc,created_at.asc'),
       sb('transactions?select=*&order=data.desc,created_at.desc&limit=500'),
       sb('revenues?select=*&order=created_at.asc'),
       sb('couple_settings?select=*&id=eq.1'),
@@ -1023,7 +1084,9 @@ async function loadAll(silent=false){
       sb('goals?select=*&order=data_limite.asc'),
       sb('debts?select=*&order=created_at.asc'),
       sb('wishes?select=*&order=created_at.desc'),
-      sb('investments?select=*&order=created_at.desc')
+      sb('investments?select=*&order=created_at.desc'),
+      sb('recurrings?select=*&order=dia.asc'),
+      sb('monthly_reports?select=*&order=mes.desc')
     ]);
     S.cats = (cats||[]).map(c=>({...c, subs:Array.isArray(c.subs)?c.subs:[], limit:Number(c.limit_value)||0}));
     S.tx = tx||[];
@@ -1035,10 +1098,13 @@ async function loadAll(silent=false){
     S.debts = debts||[];
     S.wishes = wishes||[];
     S.investments = investments||[];
+    S.recs = recs||[];
+    S.reports = reports||[];
     if(cfg && cfg[0]) S.names = [cfg[0].partner1, cfg[0].partner2];
     S.online = true; S.configured = true;
     setBanner('');
     render();
+    processRecurrings();
   }catch(e){
     console.error(e);
     S.online = false;
@@ -1094,7 +1160,7 @@ function render(){
 }
 function renderView(v){
   if(v==='dashboard') renderDash();
-  if(v==='transactions') renderTx();
+  if(v==='transactions'){ renderTx(); renderRecs(); }
   if(v==='revenues') renderRevs();
   if(v==='cards') renderCards();
   if(v==='goals') renderGoals();
@@ -1194,7 +1260,7 @@ function showConfirmModal(p){
     <div class="fg"><label>Descricao</label><input type="text" id="cfDesc" value="${escHtml(p.descricao)}"></div>
     <div class="frow">
       <div class="fg"><label>Valor (R$)</label><input type="number" id="cfVal" value="${p.valor}" min="0" step="0.01" inputmode="decimal"></div>
-      <div class="fg"><label>Data</label><input type="date" id="cfData" value="${p.data}"></div>
+      <div class="fg"><label>Data</label><input type="date" id="cfData" value="${p.data}" onchange="updateInvHint('cf')"></div>
     </div>
     <div class="frow">
       <div class="fg"><label>Categoria</label><select id="cfCat" onchange="updateSubs('cfSub','cfCat')">${catOpts}</select></div>
@@ -1209,9 +1275,10 @@ function showConfirmModal(p){
     </div>
     <div class="frow">
       <div class="fg"><label>Metodo de pagamento</label>
-        <select id="cfMetodo" onchange="toggleParcelas('cfMetodo','cfParcWrap')">
-          <option value="pix" ${p.metodo!=='credit'?'selected':''}>Pix / Debito</option>
+        <select id="cfMetodo" onchange="onMetodoChange('cf')">
+          <option value="pix" ${(p.metodo!=='credit'&&p.metodo!=='benefit')?'selected':''}>Pix / Debito</option>
           <option value="credit" ${p.metodo==='credit'?'selected':''}>Credito</option>
+          <option value="benefit" ${p.metodo==='benefit'?'selected':''}>Cartao beneficio</option>
         </select>
       </div>
       <div class="fg" id="cfParcWrap" style="display:${p.metodo==='credit'?'':'none'};"><label>Parcelas</label>
@@ -1219,8 +1286,13 @@ function showConfirmModal(p){
           ${[1,2,3,4,5,6,7,8,9,10,11,12,15,18,24].map(n=>`<option value="${n}" ${n===(p.parcelas||1)?'selected':''}>${n===1?'A vista (1x)':n+'x'}</option>`).join('')}
         </select>
       </div>
+    </div>
+    <div class="fg" id="cfCardWrap" style="display:${p.metodo==='credit'?'':'none'};"><label>Em qual cartao?</label>
+      <select id="cfCardSel" onchange="updateInvHint('cf')"></select>
+      <div id="cfInvHint" style="font-size:11px;color:var(--text-2);margin-top:6px;"></div>
     </div>`;
   openM('modalConfirm');
+  onMetodoChange('cf');
 }
 
 async function saveConfirm(){
@@ -1229,7 +1301,12 @@ async function saveConfirm(){
   btn.disabled=true;
   try{
     const metodo=document.getElementById('cfMetodo').value;
-    await sb('transactions',{ method:'POST', body: JSON.stringify({
+    let card_id=null;
+    if(metodo==='credit'){
+      card_id=document.getElementById('cfCardSel').value||null;
+      if(!card_id){toast('Escolha em qual cartao foi o gasto (cadastre um na aba Cartoes se preciso)','err');btn.disabled=false;return;}
+    }
+    const r=await sb('transactions',{ method:'POST', body: JSON.stringify({
       descricao: document.getElementById('cfDesc').value,
       valor: parseFloat(document.getElementById('cfVal').value)||0,
       cat_id: document.getElementById('cfCat').value||null,
@@ -1237,9 +1314,10 @@ async function saveConfirm(){
       data: document.getElementById('cfData').value,
       pessoa: document.getElementById('cfPes').value,
       tipo: document.getElementById('cfTipo').value,
-      metodo,
+      metodo, card_id,
       parcelas: metodo==='credit' ? (parseInt(document.getElementById('cfParc').value)||1) : 1
     })});
+    if(r && r[0]) await syncCardMirror(r[0]);
     closeM('modalConfirm');
     document.getElementById('aiInput').value='';
     toast('Lancamento salvo!','ok');
@@ -1334,7 +1412,10 @@ function renderDash(){
   const mTx=S.tx.filter(t=>inMonth(t.data,mk));
   const mRev=S.rev.filter(r=>r.recorrencia!=='once'||inMonth(r.data,mk));
 
-  const totExp=mTx.reduce((s,t)=>s+Number(t.valor),0);
+  /* credito nao desconta do saldo: so pix/debito e faturas pagas contam */
+  const mTxCash=mTx.filter(t=>t.metodo!=='credit');
+  const credMes=S.cardTx.filter(t=>inMonth(t.data,mk)).reduce((s,t)=>s+Number(t.valor),0);
+  const totExp=mTxCash.reduce((s,t)=>s+Number(t.valor),0);
   const totRev=mRev.reduce((s,r)=>{
     const v=Number(r.valor);
     if(r.recorrencia==='biweekly') return s+v*2;
@@ -1342,12 +1423,12 @@ function renderDash(){
     return s+v;
   },0);
   const bal=totRev-totExp;
-  const fixed=mTx.filter(t=>t.tipo==='fixed').reduce((s,t)=>s+Number(t.valor),0);
-  const vary=mTx.filter(t=>t.tipo==='variable').reduce((s,t)=>s+Number(t.valor),0);
+  const fixed=mTxCash.filter(t=>t.tipo==='fixed').reduce((s,t)=>s+Number(t.valor),0);
+  const vary=mTxCash.filter(t=>t.tipo==='variable').reduce((s,t)=>s+Number(t.valor),0);
 
   document.getElementById('statsGrid').innerHTML=`
     <div class="stat-card"><div class="stat-label">Receitas</div><div class="stat-val green">${fmt(totRev)}</div><div class="stat-note">este mes</div></div>
-    <div class="stat-card"><div class="stat-label">Gastos</div><div class="stat-val red">${fmt(totExp)}</div><div class="stat-note">fixas ${fmt(fixed)} + var. ${fmt(vary)}</div></div>
+    <div class="stat-card"><div class="stat-label">Gastos</div><div class="stat-val red">${fmt(totExp)}</div><div class="stat-note">fixas ${fmt(fixed)} + var. ${fmt(vary)}${credMes>0?` · credito ${fmt(credMes)} (desconta ao pagar a fatura)`:''}</div></div>
     <div class="stat-card"><div class="stat-label">Saldo</div><div class="stat-val ${bal>=0?'green':'red'}">${fmt(bal)}</div><div class="stat-note">${bal>=0?'dentro do orcamento':'acima do orcamento'}</div></div>
     <div class="stat-card"><div class="stat-label">Lancamentos</div><div class="stat-val">${mTx.length}</div><div class="stat-note">registros no mes</div></div>`;
 
@@ -1368,24 +1449,34 @@ function renderDash(){
     </div>
     ${both>0?`<div style="font-size:11px;color:var(--text-3);margin-top:6px;">Compartilhado: ${fmt(both)}</div>`:''}`;
 
-  const limHtml = S.cats.filter(c=>c.limit>0).map(c=>{
+  const maxSpentCat=Math.max(...S.cats.map(c=>mTx.filter(t=>t.cat_id===c.id).reduce((s,t)=>s+Number(t.valor),0)),1);
+  const limHtml = S.cats.map(c=>{
     const spent=mTx.filter(t=>t.cat_id===c.id).reduce((s,t)=>s+Number(t.valor),0);
-    const pct=Math.min(100,(spent/c.limit)*100);
-    const realPct=((spent/c.limit)*100).toFixed(0);
-    const col=pct>=100?'var(--red)':pct>=80?'var(--amber)':c.color;
+    if(c.limit>0){
+      const pct=Math.min(100,(spent/c.limit)*100);
+      const realPct=((spent/c.limit)*100).toFixed(0);
+      const col=pct>=100?'var(--red)':pct>=80?'var(--amber)':c.color;
+      return `<div style="margin-bottom:11px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;gap:8px;">
+          <span style="font-weight:500;">${escHtml(c.name)}</span>
+          <span style="color:var(--text-2);white-space:nowrap;">${fmt(spent)} / ${fmt(c.limit)} — ${realPct}%</span>
+        </div>
+        <div class="prog-track"><div class="prog-fill" style="width:${pct.toFixed(0)}%;background:${col};"></div></div>
+      </div>`;
+    }
     return `<div style="margin-bottom:11px;">
       <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;gap:8px;">
         <span style="font-weight:500;">${escHtml(c.name)}</span>
-        <span style="color:var(--text-2);white-space:nowrap;">${fmt(spent)} / ${fmt(c.limit)} — ${realPct}%</span>
+        <span style="color:var(--text-3);white-space:nowrap;">${fmt(spent)} · sem limite</span>
       </div>
-      <div class="prog-track"><div class="prog-fill" style="width:${pct.toFixed(0)}%;background:${col};"></div></div>
+      <div class="prog-track"><div class="prog-fill" style="width:${(spent/maxSpentCat*100).toFixed(0)}%;background:${c.color};opacity:.55;"></div></div>
     </div>`;
-  }).join('')||'<div style="color:var(--text-3);font-size:12px;">Nenhum limite configurado. Defina limites em Categorias.</div>';
+  }).join('')||'<div style="color:var(--text-3);font-size:12px;">Nenhuma categoria cadastrada.</div>';
   document.getElementById('catLimits').innerHTML=limHtml;
 
   /* formas de pagamento do mes */
   const totPix=mTx.filter(t=>t.metodo!=='credit').reduce((s,t)=>s+Number(t.valor),0);
-  const totCred=mTx.filter(t=>t.metodo==='credit').reduce((s,t)=>s+Number(t.valor),0);
+  const totCred=S.cardTx.filter(t=>inMonth(t.data,mk)).reduce((s,t)=>s+Number(t.valor),0);
   const totPm=Math.max(totPix+totCred,1);
   document.getElementById('payMethods').innerHTML = (totPix+totCred)===0
     ? '<div style="color:var(--text-3);font-size:12px;">Nenhum gasto registrado neste mes.</div>'
@@ -1401,26 +1492,41 @@ function renderDash(){
       </div>
       <div style="font-size:11px;color:var(--text-3);margin-top:6px;">${((totCred/totPm)*100).toFixed(0)}% dos gastos do mes foram no credito</div>`;
 
-  /* compras parceladas: pagas vs restantes */
-  const parcTx=S.tx.filter(t=>t.metodo==='credit' && Number(t.parcelas)>1);
-  const activeParc=parcTx.map(t=>{
-    const [y,m]=String(t.data).split('-').map(Number);
-    const buyYm=y*12+(m-1);
-    const n=Number(t.parcelas);
-    const paid=Math.min(Math.max(ymNow()-buyYm+1,0),n);
-    return {...t,n,paid,left:n-paid};
-  }).filter(t=>t.left>0).sort((a,b)=>b.left-a.left);
+  /* compras no cartao: parcelas organizadas pelo ciclo de fatura de cada cartao */
+  const activeParc=S.cardTx.map(t=>{
+    const card=S.cards.find(c=>c.id===t.card_id);
+    if(!card) return null;
+    const n=Math.max(1,Number(t.parcelas)||1);
+    const firstYm=firstInvoiceYm(card,t.data);
+    const openYm=currentOpenYm(card);
+    const paid=Math.min(Math.max(openYm-firstYm,0),n);   /* parcelas em faturas ja fechadas */
+    const left=n-paid;
+    const nextYm=Math.max(firstYm,openYm);               /* fatura da proxima parcela */
+    return {...t,card,n,paid,left,nextYm,active:(firstYm+n-1)>=openYm};
+  }).filter(t=>t&&t.active).sort((a,b)=>b.left-a.left);
   document.getElementById('installments').innerHTML = activeParc.length===0
-    ? '<div style="color:var(--text-3);font-size:12px;">Nenhuma compra parcelada em andamento.</div>'
-    : activeParc.slice(0,6).map(t=>`
+    ? '<div style="color:var(--text-3);font-size:12px;">Nenhuma compra no cartao em andamento.</div>'
+    : activeParc.slice(0,7).map(t=>{
+        const range=cycleRange(t.card,t.nextYm);
+        const qualFat=t.nextYm===currentOpenYm(t.card)?'fatura atual':'proxima fatura';
+        if(t.n===1) return `
+      <div style="margin-bottom:11px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;gap:8px;">
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(t.descricao)}</span>
+          <span style="color:var(--text-2);white-space:nowrap;">${fmt(t.valor)} a vista</span>
+        </div>
+        <div style="font-size:10px;color:var(--text-3);">${escHtml(t.card.name)} · ${qualFat}, fecha ${fmtD(range.end)}</div>
+      </div>`;
+        return `
       <div style="margin-bottom:11px;">
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;gap:8px;">
           <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(t.descricao)}</span>
           <span style="color:var(--text-2);white-space:nowrap;">${t.paid}/${t.n} pagas · ${fmt(Number(t.valor)/t.n)}/mes</span>
         </div>
         <div class="prog-track"><div class="prog-fill" style="width:${(t.paid/t.n*100).toFixed(0)}%;background:#8B5CF6;"></div></div>
-        <div style="font-size:10px;color:var(--text-3);margin-top:3px;">faltam ${t.left} parcela${t.left>1?'s':''} — ${fmt(Number(t.valor)/t.n*t.left)}</div>
-      </div>`).join('');
+        <div style="font-size:10px;color:var(--text-3);margin-top:3px;">${escHtml(t.card.name)} · faltam ${t.left} parcela${t.left>1?'s':''} (${fmt(Number(t.valor)/t.n*t.left)}) · proxima na ${qualFat}, fecha ${fmtD(range.end)}</div>
+      </div>`;
+      }).join('');
 
   document.getElementById('dashCards').innerHTML = S.cards.length===0
     ? '<div style="color:var(--text-3);font-size:12px;">Nenhum cartao cadastrado. Adicione em Cartoes.</div>'
@@ -1472,7 +1578,14 @@ function renderDash(){
     }
     return out;
   }).join('');
-  document.getElementById('alertsBox').innerHTML=cardAlerts+catAlerts;
+  let fechAlert='';
+  if(new Date().getDate()<=7 && CFG.apiKey){
+    const prev=prevMonthKey();
+    if(!S.reports.find(r=>r.mes===prev) && S.tx.some(t=>inMonth(t.data,prev))){
+      fechAlert=`<div class="alert alert-blue" style="cursor:pointer;" onclick="go('reports')">O mes de ${monthLabel(prev)} fechou! Toque aqui para gerar o resumo do Fin na aba Graficos.</div>`;
+    }
+  }
+  document.getElementById('alertsBox').innerHTML=cardAlerts+catAlerts+fechAlert;
 }
 
 /* ============================================================
@@ -1513,6 +1626,59 @@ async function delTx(id){
   }catch(e){ console.error(e); toast('Erro ao remover. Tente novamente.','err'); }
 }
 
+function cardTipo(c){ return (c&&c.tipo)==='benefit'?'benefit':'credit'; }
+
+function benefitBalance(card, mk){
+  const mes=mk||monthKey();
+  const gasto=S.cardTx.filter(t=>t.card_id===card.id && inMonth(t.data,mes)).reduce((s,t)=>s+Number(t.valor),0);
+  const total=Number(card.benefit_value)||0;
+  return {total, gasto, saldo: total-gasto};
+}
+
+function populateCardSelect(selId, tipo){
+  const el=document.getElementById(selId); if(!el)return;
+  const prev=el.value;
+  const list=S.cards.filter(c=>cardTipo(c)===(tipo||'credit'));
+  el.innerHTML = list.length===0
+    ? `<option value="">Nenhum cartao ${tipo==='benefit'?'beneficio':'de credito'} cadastrado</option>`
+    : list.map(c=>`<option value="${c.id}">${escHtml(c.name)}</option>`).join('');
+  if(prev && list.some(c=>c.id===prev)) el.value=prev;
+}
+
+function invoiceHint(cardId, dateStr){
+  const card=S.cards.find(c=>c.id===cardId);
+  if(!card) return '';
+  if(cardTipo(card)==='benefit'){
+    const b=benefitBalance(card);
+    return `Saldo disponivel no ${card.name} este mes: ${fmt(b.saldo)} de ${fmt(b.total)}.`;
+  }
+  if(!dateStr) return '';
+  const ym=firstInvoiceYm(card, dateStr);
+  const openYm=currentOpenYm(card);
+  const range=cycleRange(card, ym);
+  const qual = ym===openYm ? 'fatura atual' : (ym>openYm ? 'proxima fatura' : 'fatura ja fechada');
+  return `Entra na ${qual} do ${card.name} — fecha ${fmtD(range.end)}, vence ${fmtDate(dueDateIso(card,ym))}.`;
+}
+
+function updateInvHint(prefix){
+  const hint=document.getElementById(prefix+'InvHint'); if(!hint)return;
+  const cardId=document.getElementById(prefix+'CardSel')?.value;
+  const dateStr=document.getElementById(prefix==='cf'?'cfData':prefix+'Date')?.value;
+  hint.textContent = invoiceHint(cardId, dateStr);
+}
+
+function onMetodoChange(prefix){
+  const metodo=document.getElementById(prefix+'Metodo').value;
+  const credit=metodo==='credit', ben=metodo==='benefit';
+  document.getElementById(prefix+'ParcWrap').style.display = credit?'':'none';
+  document.getElementById(prefix+'CardWrap').style.display = (credit||ben)?'':'none';
+  if(credit||ben){
+    populateCardSelect(prefix+'CardSel', ben?'benefit':'credit');
+    updateInvHint(prefix);
+  }
+}
+
+/* mantido por compatibilidade */
 function toggleParcelas(selId, wrapId){
   const metodo=document.getElementById(selId).value;
   document.getElementById(wrapId).style.display = metodo==='credit' ? '' : 'none';
@@ -1522,6 +1688,7 @@ function openTxModal(id){
   const t = id ? S.tx.find(x=>x.id===id) : null;
   populateCatSelect('mTxCat');
   populatePersonSelect('mTxPerson');
+  populateCardSelect('mTxCardSel');
   document.getElementById('mTxTitle').textContent = t ? 'Editar gasto' : 'Adicionar gasto';
   document.getElementById('mTxId').value = t ? t.id : '';
   document.getElementById('mTxDesc').value = t ? t.descricao : '';
@@ -1534,8 +1701,21 @@ function openTxModal(id){
   document.getElementById('mTxType').value = t ? t.tipo : 'variable';
   document.getElementById('mTxMetodo').value = t ? (t.metodo||'pix') : 'pix';
   document.getElementById('mTxParc').value = t ? String(t.parcelas||1) : '1';
-  toggleParcelas('mTxMetodo','mTxParcWrap');
+  if(t && t.card_id) document.getElementById('mTxCardSel').value = t.card_id;
+  onMetodoChange('mTx');
   openM('modalTx');
+}
+
+/* mantem o espelho do gasto de credito na aba de cartoes */
+async function syncCardMirror(tx){
+  const mirror=S.cardTx.find(ct=>ct.tx_id===tx.id);
+  if(tx.metodo==='credit' && tx.card_id){
+    const body={card_id:tx.card_id, descricao:tx.descricao, valor:tx.valor, parcelas:tx.parcelas||1, data:tx.data, tx_id:tx.id};
+    if(mirror) await sb(`card_transactions?id=eq.${mirror.id}`,{method:'PATCH',body:JSON.stringify(body)});
+    else await sb('card_transactions',{method:'POST',body:JSON.stringify(body)});
+  } else if(mirror){
+    await sb(`card_transactions?id=eq.${mirror.id}`,{method:'DELETE'});
+  }
 }
 
 async function saveTx(){
@@ -1545,6 +1725,11 @@ async function saveTx(){
   const val=parseFloat(document.getElementById('mTxAmt').value)||0;
   if(!desc||!val){toast('Preencha descricao e valor','err');return;}
   const metodo=document.getElementById('mTxMetodo').value;
+  let card_id=null;
+  if(metodo==='credit'){
+    card_id=document.getElementById('mTxCardSel').value||null;
+    if(!card_id){toast('Escolha em qual cartao foi o gasto (cadastre um na aba Cartoes se preciso)','err');return;}
+  }
   const body={
     descricao:desc, valor:val,
     cat_id:document.getElementById('mTxCat').value||null,
@@ -1552,13 +1737,15 @@ async function saveTx(){
     pessoa:document.getElementById('mTxPerson').value,
     tipo:document.getElementById('mTxType').value,
     data:document.getElementById('mTxDate').value,
-    metodo,
+    metodo, card_id,
     parcelas: metodo==='credit' ? (parseInt(document.getElementById('mTxParc').value)||1) : 1
   };
   try{
-    if(id) await sb(`transactions?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(body)});
-    else await sb('transactions',{method:'POST',body:JSON.stringify(body)});
-    closeM('modalTx'); toast(id?'Gasto atualizado!':'Gasto adicionado!','ok');
+    let tx;
+    if(id){ const r=await sb(`transactions?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(body)}); tx=r&&r[0]; }
+    else { const r=await sb('transactions',{method:'POST',body:JSON.stringify(body)}); tx=r&&r[0]; }
+    if(tx) await syncCardMirror(tx);
+    closeM('modalTx'); toast(id?'Gasto atualizado!':(metodo==='credit'?'Gasto adicionado e lancado na fatura do cartao!':'Gasto adicionado!'),'ok');
     document.getElementById('mTxDesc').value=''; document.getElementById('mTxAmt').value='';
     await loadAll(true);
   }catch(e){ console.error(e); toast('Erro ao gravar. Tente novamente.','err'); }
@@ -1737,7 +1924,14 @@ function openCcTxModal(cardId){
   document.getElementById('mCcTxAmt').value='';
   document.getElementById('mCcTxParc').value='1';
   document.getElementById('mCcTxDate').value=today();
+  updateCcTxHint();
   openM('modalCcTx');
+}
+
+function updateCcTxHint(){
+  const cardId=document.getElementById('mCcTxCardId').value;
+  const dateStr=document.getElementById('mCcTxDate').value;
+  document.getElementById('mCcTxInvHint').textContent=invoiceHint(cardId,dateStr);
 }
 
 async function saveCcTx(){
@@ -1759,9 +1953,12 @@ async function saveCcTx(){
 
 async function delCcTx(id){
   if(!canWrite()) return;
-  if(!confirm('Remover esta compra? O valor sai da fatura.'))return;
+  const t=S.cardTx.find(x=>x.id===id);
+  const linked=t&&t.tx_id;
+  if(!confirm(linked?'Esta compra esta vinculada a um gasto da aba Gastos. Remover os dois? O valor sai da fatura.':'Remover esta compra? O valor sai da fatura.'))return;
   try{
-    await sb(`card_transactions?id=eq.${id}`,{method:'DELETE'});
+    if(linked) await sb(`transactions?id=eq.${t.tx_id}`,{method:'DELETE'}); /* cascade apaga o espelho */
+    else await sb(`card_transactions?id=eq.${id}`,{method:'DELETE'});
     await loadAll(true);
   }catch(e){ console.error(e); toast('Erro ao remover. Tente novamente.','err'); }
 }
@@ -1786,6 +1983,114 @@ async function payInvoice(cardId, ym){
     toast('Fatura paga! Valor deduzido do saldo do mes.','ok');
     await loadAll(true);
   }catch(e){ console.error(e); toast('Erro ao gravar. Tente novamente.','err'); }
+}
+
+/* ============================================================
+   GASTOS RECORRENTES - lancamento automatico mensal
+   ============================================================ */
+function renderRecs(){
+  const el=document.getElementById('recList'); if(!el)return;
+  el.innerHTML = S.recs.length===0
+    ? '<div style="color:var(--text-3);font-size:12px;">Nenhum recorrente cadastrado. Ex: internet, energia, racao da Kiara.</div>'
+    : S.recs.map(r=>{
+        const c=catById(r.cat_id);
+        return `<div class="tx-item">
+          <div class="tx-dot" style="background:${c.color};opacity:${r.ativo?1:.35};"></div>
+          <div class="tx-info" style="opacity:${r.ativo?1:.55};">
+            <div class="tx-desc">${escHtml(r.descricao)}</div>
+            <div class="tx-meta">${escHtml(c.name)}${r.sub?' · '+escHtml(r.sub):''} · todo dia ${r.dia}${r.ativo?'':' · pausado'}</div>
+          </div>
+          <div class="tx-amount" style="opacity:${r.ativo?1:.55};">-${fmt(r.valor)}</div>
+          <button class="tx-del" onclick="toggleRec('${r.id}')" title="${r.ativo?'Pausar':'Reativar'}" style="font-size:13px;">${r.ativo?'&#10074;&#10074;':'&#9654;'}</button>
+          <button class="tx-del" onclick="openRecModal('${r.id}')" aria-label="Editar" style="font-size:13px;">&#9998;</button>
+          <button class="tx-del" onclick="delRec('${r.id}')" aria-label="Remover">&#10005;</button>
+        </div>`;
+      }).join('');
+}
+
+function openRecModal(id){
+  const r = id ? S.recs.find(x=>x.id===id) : null;
+  populateCatSelect('mRecCat');
+  populatePersonSelect('mRecPerson');
+  document.getElementById('mRecTitle').textContent = r ? 'Editar recorrente' : 'Novo gasto recorrente';
+  document.getElementById('mRecId').value = r ? r.id : '';
+  document.getElementById('mRecDesc').value = r ? r.descricao : '';
+  document.getElementById('mRecVal').value = r ? r.valor : '';
+  document.getElementById('mRecDia').value = r ? r.dia : '';
+  if(r && r.cat_id) document.getElementById('mRecCat').value = r.cat_id;
+  updateSubs('mRecSub','mRecCat');
+  if(r && r.sub) document.getElementById('mRecSub').value = r.sub;
+  document.getElementById('mRecPerson').value = r ? String(r.pessoa) : 'both';
+  openM('modalRec');
+}
+
+async function saveRec(){
+  if(!canWrite()) return;
+  const id=document.getElementById('mRecId').value;
+  const desc=document.getElementById('mRecDesc').value.trim();
+  const val=parseFloat(document.getElementById('mRecVal').value)||0;
+  const dia=parseInt(document.getElementById('mRecDia').value)||0;
+  if(!desc||!val||!dia){toast('Preencha descricao, valor e dia do mes','err');return;}
+  const body={
+    descricao:desc, valor:val, dia,
+    cat_id:document.getElementById('mRecCat').value||null,
+    sub:document.getElementById('mRecSub').value,
+    pessoa:document.getElementById('mRecPerson').value
+  };
+  try{
+    if(id) await sb(`recurrings?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(body)});
+    else await sb('recurrings',{method:'POST',body:JSON.stringify(body)});
+    closeM('modalRec'); toast(id?'Recorrente atualizado!':'Recorrente criado! Sera lancado todo mes.','ok');
+    await loadAll(true);
+  }catch(e){ console.error(e); toast('Erro ao gravar. Tente novamente.','err'); }
+}
+
+async function toggleRec(id){
+  if(!canWrite()) return;
+  const r=S.recs.find(x=>x.id===id); if(!r)return;
+  try{
+    await sb(`recurrings?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({ativo:!r.ativo})});
+    await loadAll(true);
+  }catch(e){ console.error(e); toast('Erro ao gravar. Tente novamente.','err'); }
+}
+
+async function delRec(id){
+  if(!canWrite()) return;
+  if(!confirm('Remover este recorrente? Os gastos ja lancados continuam no historico.'))return;
+  try{
+    await sb(`recurrings?id=eq.${id}`,{method:'DELETE'});
+    await loadAll(true);
+  }catch(e){ console.error(e); toast('Erro ao remover. Tente novamente.','err'); }
+}
+
+let recProcessed=false;
+async function processRecurrings(){
+  if(recProcessed || !S.online || !sbReady()) return;
+  const mk=monthKey();
+  const hoje=new Date();
+  const due=S.recs.filter(r=>r.ativo && r.ultimo_mes!==mk && hoje.getDate()>=Number(r.dia));
+  recProcessed=true;
+  if(due.length===0) return;
+  try{
+    let lancados=0;
+    for(const r of due){
+      const dim=new Date(hoje.getFullYear(),hoje.getMonth()+1,0).getDate();
+      const dataStr=`${mk}-${String(Math.min(Number(r.dia),dim)).padStart(2,'0')}`;
+      const dup=S.tx.some(t=>t.data===dataStr && t.descricao===r.descricao && Number(t.valor)===Number(r.valor));
+      if(!dup){
+        await sb('transactions',{method:'POST',body:JSON.stringify({
+          descricao:r.descricao, valor:r.valor, cat_id:r.cat_id, sub:r.sub||'',
+          pessoa:r.pessoa, tipo:'fixed', metodo:'pix', parcelas:1, data:dataStr
+        })});
+        lancados++;
+      }
+      await sb(`recurrings?id=eq.${r.id}`,{method:'PATCH',body:JSON.stringify({ultimo_mes:mk})});
+    }
+    if(lancados>0){
+      toast(`${lancados} gasto${lancados>1?'s':''} recorrente${lancados>1?'s':''} lancado${lancados>1?'s':''} automaticamente`,'ok');
+      await loadAll(true);
+    }
+  }catch(e){ console.error(e); }
 }
 
 /* ============================================================
@@ -2508,7 +2813,10 @@ async function sendFin(){
    ============================================================ */
 function renderCats(){
   document.getElementById('catList').innerHTML=S.cats.map(c=>`
-    <div class="cat-row">
+    <div class="cat-row" data-id="${c.id}">
+      <div class="drag-handle" aria-label="Arrastar para reordenar">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;"><circle cx="8" cy="5" r="1.6"/><circle cx="16" cy="5" r="1.6"/><circle cx="8" cy="12" r="1.6"/><circle cx="16" cy="12" r="1.6"/><circle cx="8" cy="19" r="1.6"/><circle cx="16" cy="19" r="1.6"/></svg>
+      </div>
       <div class="cat-dot" style="background:${c.color};"></div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:600;">${escHtml(c.name)}</div>
@@ -2521,6 +2829,50 @@ function renderCats(){
         <button class="btn btn-secondary btn-sm" onclick="delCat('${c.id}')">&#10005;</button>
       </div>
     </div>`).join('')||'<div class="empty">Nenhuma categoria. Rode o script SQL no Supabase ou crie uma nova.</div>';
+  initCatDrag();
+}
+
+/* arrastar e soltar: toque e segure a alca de pontinhos e arraste */
+let catDragEl=null;
+function initCatDrag(){
+  document.querySelectorAll('#catList .drag-handle').forEach(h=>{
+    h.addEventListener('pointerdown', startCatDrag);
+  });
+}
+function startCatDrag(e){
+  e.preventDefault();
+  catDragEl=e.target.closest('.cat-row');
+  if(!catDragEl) return;
+  catDragEl.classList.add('dragging');
+  document.addEventListener('pointermove', moveCatDrag);
+  document.addEventListener('pointerup', endCatDrag);
+}
+function moveCatDrag(e){
+  if(!catDragEl) return;
+  const list=document.getElementById('catList');
+  const rows=[...list.querySelectorAll('.cat-row:not(.dragging)')];
+  const after=rows.find(r=>{
+    const rect=r.getBoundingClientRect();
+    return e.clientY < rect.top + rect.height/2;
+  });
+  if(after) list.insertBefore(catDragEl, after);
+  else list.appendChild(catDragEl);
+}
+async function endCatDrag(){
+  document.removeEventListener('pointermove', moveCatDrag);
+  document.removeEventListener('pointerup', endCatDrag);
+  if(!catDragEl) return;
+  catDragEl.classList.remove('dragging');
+  catDragEl=null;
+  const ids=[...document.querySelectorAll('#catList .cat-row')].map(r=>r.dataset.id);
+  const oldOrder=S.cats.map(c=>c.id).join(',');
+  if(ids.join(',')===oldOrder) return; /* nada mudou */
+  S.cats.sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id));
+  if(!canWrite()){ renderCats(); return; }
+  try{
+    await Promise.all(ids.map((id,idx)=>sb(`categories?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({ordem:idx})})));
+    toast('Ordem das categorias salva!','ok');
+  }catch(e){ console.error(e); toast('Erro ao salvar a ordem. Tente novamente.','err'); }
 }
 
 function openCatModal(id){
@@ -2596,6 +2948,92 @@ function renderReports(){
   drawPie(mTx);
   drawLine();
   drawTop(mTx);
+  renderMonthlyReport();
+}
+
+/* ============================================================
+   FECHAMENTO MENSAL DO FIN
+   ============================================================ */
+function prevMonthKey(){
+  const d=new Date(); d.setMonth(d.getMonth()-1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function monthLabel(mk){
+  const mn=['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const [y,m]=mk.split('-').map(Number);
+  return `${mn[m-1]}/${y}`;
+}
+function monthSnapshot(mk){
+  const mTx=S.tx.filter(t=>inMonth(t.data,mk));
+  const cash=mTx.filter(t=>t.metodo!=='credit');
+  const gastos=+cash.reduce((s,t)=>s+Number(t.valor),0).toFixed(2);
+  const credito=+S.cardTx.filter(t=>inMonth(t.data,mk)).reduce((s,t)=>s+Number(t.valor),0).toFixed(2);
+  const mRev=S.rev.filter(r=>r.recorrencia!=='once'||inMonth(r.data,mk));
+  const receitas=+mRev.reduce((s,r)=>{const v=Number(r.valor);if(r.recorrencia==='biweekly')return s+v*2;if(r.recorrencia==='weekly')return s+v*4.3;return s+v;},0).toFixed(2);
+  const porCat={};
+  mTx.forEach(t=>{const c=catById(t.cat_id); porCat[c.name]=+((porCat[c.name]||0)+Number(t.valor)).toFixed(2);});
+  const limites=S.cats.filter(c=>c.limit>0).map(c=>({categoria:c.name,limite:c.limit,gasto:porCat[c.name]||0}));
+  return {mes:mk, receitas, gastos_caixa:gastos, compras_credito:credito, saldo:+(receitas-gastos).toFixed(2), por_categoria:porCat, limites, lancamentos:mTx.length};
+}
+
+function renderMonthlyReport(){
+  const el=document.getElementById('monthlyReport'); if(!el)return;
+  const prev=prevMonthKey();
+  const rep=S.reports.find(r=>r.mes===prev);
+  const temDados=S.tx.some(t=>inMonth(t.data,prev));
+  if(rep){
+    el.innerHTML=`
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:8px;">Resumo de ${monthLabel(prev)}, gerado pelo Fin</div>
+      <div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">${escHtml(rep.texto)}</div>
+      <button class="btn btn-secondary btn-sm" id="btnGenReport" style="margin-top:12px;" onclick="genMonthlyReport()">Gerar novamente</button>`;
+  } else if(!temDados){
+    el.innerHTML=`<div style="color:var(--text-3);font-size:12px;">Sem lancamentos em ${monthLabel(prev)}. O fechamento fica disponivel quando houver um mes com registros.</div>`;
+  } else {
+    el.innerHTML=`
+      <div style="font-size:12px;color:var(--text-2);margin-bottom:10px;">O mes de ${monthLabel(prev)} fechou! O Fin pode gerar um resumo com destaques, pontos de atencao e uma sugestao pro mes atual.</div>
+      <button class="btn btn-primary btn-sm" id="btnGenReport" onclick="genMonthlyReport()">Gerar fechamento de ${monthLabel(prev)}</button>`;
+  }
+}
+
+async function genMonthlyReport(){
+  if(!canWrite()) return;
+  if(!CFG.apiKey){ toast('Configure a chave da API Anthropic em Configuracoes','err'); return; }
+  const prev=prevMonthKey();
+  const btn=document.getElementById('btnGenReport');
+  if(btn){ btn.disabled=true; btn.textContent='Gerando...'; }
+  const antes=new Date(); antes.setMonth(antes.getMonth()-2);
+  const mkAntes=`${antes.getFullYear()}-${String(antes.getMonth()+1).padStart(2,'0')}`;
+  try{
+    const r=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true',
+        'x-api-key': CFG.apiKey
+      },
+      body: JSON.stringify({
+        model:'claude-haiku-4-5-20251001',
+        max_tokens:800,
+        system:'Voce e o Fin, assessor financeiro do casal Kaik e Bia no app Financa a Dois. Escreva o fechamento do mes em portugues brasileiro, texto puro sem markdown, em 4 a 6 paragrafos curtos: 1) visao geral do mes (receitas, gastos, saldo); 2) um destaque positivo; 3) um ponto de atencao (categoria estourada, credito alto ou gasto fora do padrao); 4) comparacao com o mes anterior se houver dados; 5) uma sugestao pratica e um incentivo para o mes que comeca. Seja acolhedor, direto e use os valores reais.',
+        messages:[{role:'user',content:`Mes fechado: ${JSON.stringify(monthSnapshot(prev))}\n\nMes anterior (para comparacao): ${JSON.stringify(monthSnapshot(mkAntes))}\n\nGere o fechamento.`}]
+      })
+    });
+    const data=await r.json();
+    if(data.error) throw new Error(data.error.message||'api error');
+    const texto=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join(' ').trim();
+    await sb('monthly_reports?on_conflict=mes',{
+      method:'POST',
+      headers:{'Prefer':'return=representation,resolution=merge-duplicates'},
+      body:JSON.stringify({mes:prev, texto})
+    });
+    toast('Fechamento gerado!','ok');
+    await loadAll(true);
+  }catch(e){
+    console.error(e);
+    toast('Erro ao gerar o fechamento. Tente novamente.','err');
+    renderMonthlyReport();
+  }
 }
 
 function drawPie(txs){
