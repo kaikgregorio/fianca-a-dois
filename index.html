@@ -1043,6 +1043,25 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
   </div>
 </div>
 
+<!-- ============================================================
+     MODAL: EDITAR VALOR DA FATURA FECHADA
+     ============================================================ -->
+<div class="overlay" id="modalInvEdit" style="display:none;">
+  <div class="modal">
+    <div class="modal-grip"></div>
+    <div class="modal-title">Editar valor da fatura</div>
+    <input type="hidden" id="mInvCardId">
+    <input type="hidden" id="mInvYm">
+    <div style="font-size:12px;color:var(--text-2);margin-bottom:12px;" id="mInvInfo"></div>
+    <div class="fg"><label>Valor total da fatura (R$)</label><input type="number" id="mInvVal" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
+    <div class="alert alert-blue" style="font-size:11px;">Util para acertar faturas de antes do app: o valor digitado vira o total desta fatura. Ao marcar como paga, e esse total que sera lancado como gasto e descontado do saldo em conta. As compras registradas continuam contando; o app guarda so a diferenca como ajuste.</div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeM('modalInvEdit')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveInvEdit()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-wrap" id="toasts"></div>
 
 <script>
@@ -1058,7 +1077,7 @@ let S = {
   tx: [], rev: [], cats: [],
   cards: [], cardTx: [], cardPay: [],
   goals: [], debts: [], wishes: [],
-  investments: [], recs: [], reports: [], goalDeps: [], finMsgs: [],
+  investments: [], recs: [], reports: [], goalDeps: [], finMsgs: [], invAdj: [],
   names: ['Parceiro 1','Parceiro 2'],
   online: true, configured: false
 };
@@ -1267,7 +1286,7 @@ async function loadAll(silent=false){
   if(!sbReady()){ setBanner('setup'); render(); return; }
   if(!SESSION){ showLogin(); return; }
   try{
-    const [cats, tx, rev, cfg, cards, cardTx, cardPay, goals, debts, wishes, investments, recs, reports, goalDeps, finRows] = await Promise.all([
+    const [cats, tx, rev, cfg, cards, cardTx, cardPay, goals, debts, wishes, investments, recs, reports, goalDeps, finRows, invAdj] = await Promise.all([
       sb('categories?select=*&order=ordem.asc,created_at.asc'),
       sb('transactions?select=*&order=data.desc,created_at.desc&limit=500'),
       sb('revenues?select=*&order=created_at.asc'),
@@ -1282,7 +1301,8 @@ async function loadAll(silent=false){
       sb('recurrings?select=*&order=dia.asc'),
       sb('monthly_reports?select=*&order=mes.desc'),
       sb('goal_deposits?select=*&order=data.desc,created_at.desc'),
-      sb('fin_messages?select=*&order=ordem.asc&limit=300')
+      sb('fin_messages?select=*&order=ordem.asc&limit=300'),
+      sb('invoice_adjustments?select=*')
     ]);
     S.cats = (cats||[]).map(c=>({...c, subs:Array.isArray(c.subs)?c.subs:[], limit:Number(c.limit_value)||0}));
     S.tx = tx||[];
@@ -1298,6 +1318,7 @@ async function loadAll(silent=false){
     S.reports = reports||[];
     S.goalDeps = goalDeps||[];
     S.finMsgs = finRows||[];
+    S.invAdj = invAdj||[];
     if(cfg && cfg[0]) S.names = [cfg[0].partner1, cfg[0].partner2];
     S.online = true; S.configured = true;
     setBanner('');
@@ -1559,6 +1580,8 @@ function invoiceValue(card, ym){
     return s;
   },0);
   if(ym===currentOpenYm(card)) total += Number(card.extra)||0;
+  const adj=S.invAdj.find(a=>a.card_id===card.id && Number(a.ym)===ym);
+  if(adj) total += Number(adj.valor);
   return total;
 }
 function isPaid(cardId, ym){
@@ -2114,6 +2137,7 @@ function renderCards(){
         const closedVal=invoiceValue(c,ymClosed);
         const closedPaid=isPaid(c.id,ymClosed);
         const rc=cycleRange(c,ymClosed), ro=cycleRange(c,ymOpen);
+        const temAdj=S.invAdj.some(a=>a.card_id===c.id && Number(a.ym)===ymClosed);
         const recent=S.cardTx.filter(t=>t.card_id===c.id).slice(0,detailed?500:5);
         return `<div class="cc-card">
           <div class="cc-band" style="background:${c.color};"></div>
@@ -2131,13 +2155,14 @@ function renderCards(){
             <div class="cc-invoice">
               <div>
                 <div class="cc-inv-label">Fatura fechada · compras de ${fmtD(rc.start)} a ${fmtD(rc.end)} · vence ${fmtDate(dueDateIso(c,ymClosed))}</div>
-                <div class="cc-inv-val">${fmt(closedVal)}</div>
+                <div class="cc-inv-val">${fmt(closedVal)}${temAdj?' <span style="font-size:10px;font-weight:500;color:var(--text-3);">(valor ajustado)</span>':''}</div>
               </div>
               ${closedPaid
                 ?'<span class="tag tag-paid">Paga</span>'
-                :closedVal>0.005
-                  ?`<button class="btn btn-primary btn-sm" onclick="payInvoice('${c.id}',${ymClosed})">Marcar como paga</button>`
-                  :'<span class="tag tag-paid" style="opacity:.65;">Sem valores</span>'}
+                :`<div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+                    <button class="btn btn-secondary btn-sm" onclick="openInvEditModal('${c.id}',${ymClosed})" title="Editar valor da fatura" aria-label="Editar valor da fatura">&#9998;</button>
+                    ${closedVal>0.005?`<button class="btn btn-primary btn-sm" onclick="payInvoice('${c.id}',${ymClosed})">Marcar como paga</button>`:''}
+                  </div>`}
             </div>
             <div class="cc-invoice">
               <div>
@@ -2341,6 +2366,42 @@ async function delCcTx(id){
     else await sb(`card_transactions?id=eq.${id}`,{method:'DELETE'});
     await loadAll(true);
   }catch(e){ console.error(e); toast('Erro ao remover. Tente novamente.','err'); }
+}
+
+function openInvEditModal(cardId, ym){
+  const card=S.cards.find(c=>c.id===cardId); if(!card)return;
+  const r=cycleRange(card, ym);
+  document.getElementById('mInvCardId').value=cardId;
+  document.getElementById('mInvYm').value=ym;
+  document.getElementById('mInvInfo').textContent=`${card.name} · compras de ${fmtD(r.start)} a ${fmtD(r.end)} · vence ${fmtDate(dueDateIso(card,ym))}`;
+  document.getElementById('mInvVal').value=invoiceValue(card,ym).toFixed(2);
+  openM('modalInvEdit');
+}
+
+async function saveInvEdit(){
+  if(!canWrite()) return;
+  const cardId=document.getElementById('mInvCardId').value;
+  const ym=parseInt(document.getElementById('mInvYm').value);
+  const card=S.cards.find(c=>c.id===cardId); if(!card)return;
+  const desejado=parseFloat(document.getElementById('mInvVal').value);
+  if(isNaN(desejado)||desejado<0){toast('Informe um valor valido','err');return;}
+  const adjAtual=S.invAdj.find(a=>a.card_id===cardId && Number(a.ym)===ym);
+  const base=invoiceValue(card,ym)-(adjAtual?Number(adjAtual.valor):0);
+  const ajuste=+(desejado-base).toFixed(2);
+  try{
+    if(Math.abs(ajuste)<0.005){
+      if(adjAtual) await sb(`invoice_adjustments?card_id=eq.${cardId}&ym=eq.${ym}`,{method:'DELETE'});
+    } else {
+      await sb('invoice_adjustments?on_conflict=card_id,ym',{
+        method:'POST',
+        headers:{'Prefer':'return=representation,resolution=merge-duplicates'},
+        body:JSON.stringify({card_id:cardId, ym, valor:ajuste})
+      });
+    }
+    closeM('modalInvEdit');
+    toast('Valor da fatura atualizado!','ok');
+    await loadAll(true);
+  }catch(e){ console.error(e); toast('Erro ao gravar. Tente novamente.','err'); }
 }
 
 async function payInvoice(cardId, ym){
