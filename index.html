@@ -834,7 +834,6 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
       </div>
       <div class="fg"><label>Cor</label><input type="color" id="mCardColor" value="#8B5CF6"></div>
     </div>
-    <div class="fg"><label>Rotulo do tipo (opcional)</label><input type="text" id="mCardRotulo" placeholder="Ex: VR, iFood, Home office, Black"></div>
     <div id="cardCreditFields">
       <div class="frow">
         <div class="fg"><label>Fatura atual - ajuste (R$)</label><input type="number" id="mCardExtra" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
@@ -2093,7 +2092,7 @@ function renderCards(){
       const list=S.cards.filter(c=>cardTipo(c)===f.tipo);
       if(f.id!=='all' && !list.some(c=>c.id===f.id)) f.id='all';
       pick.innerHTML=`<option value="all">${f.tipo==='credit'?'Todos os cartoes de credito':'Todos os beneficios'}</option>`
-        +list.map(c=>`<option value="${c.id}">${escHtml(c.name)}${c.rotulo?' · '+escHtml(c.rotulo):''}</option>`).join('');
+        +list.map(c=>`<option value="${c.id}">${escHtml(c.name)}</option>`).join('');
       pick.value=f.id;
     }
   }
@@ -2120,7 +2119,7 @@ function renderCards(){
           <div class="cc-band" style="background:${c.color};"></div>
           <div class="cc-body">
             <div class="cc-head">
-              <div class="cc-name">${escHtml(c.name)}${c.rotulo?` <span class="tag tag-paid" style="margin-left:5px;font-size:9px;">${escHtml(c.rotulo)}</span>`:''}</div>
+              <div class="cc-name">${escHtml(c.name)}</div>
               <div style="display:flex;gap:6px;">
                 <button class="btn btn-secondary btn-sm" onclick="openCardModal('${c.id}')">Editar</button>
                 <button class="btn btn-secondary btn-sm" onclick="delCard('${c.id}')">&#10005;</button>
@@ -2181,7 +2180,7 @@ function renderCards(){
           <div class="cc-band" style="background:${c.color};"></div>
           <div class="cc-body">
             <div class="cc-head">
-              <div class="cc-name">${escHtml(c.name)}${c.rotulo?` <span class="tag tag-paid" style="margin-left:5px;font-size:9px;">${escHtml(c.rotulo)}</span>`:''}</div>
+              <div class="cc-name">${escHtml(c.name)}</div>
               <div style="display:flex;gap:6px;">
                 <button class="btn btn-secondary btn-sm" onclick="openCardModal('${c.id}')">Editar</button>
                 <button class="btn btn-secondary btn-sm" onclick="delCard('${c.id}')">&#10005;</button>
@@ -2259,7 +2258,6 @@ function openCardModal(id){
   document.getElementById('mCardDue').value = c ? c.due_day : '';
   document.getElementById('mCardTipo').value = c ? cardTipo(c) : 'credit';
   document.getElementById('mCardBenVal').value = c ? (Number(c.benefit_value)||'') : '';
-  document.getElementById('mCardRotulo').value = c ? (c.rotulo||'') : '';
   onCardTipoChange();
   openM('modalCard');
 }
@@ -2270,7 +2268,7 @@ async function saveCard(){
   const name=document.getElementById('mCardName').value.trim();
   const tipo=document.getElementById('mCardTipo').value;
   if(!name){toast('Informe o nome do cartao','err');return;}
-  const body={ name, tipo, color:document.getElementById('mCardColor').value, rotulo:document.getElementById('mCardRotulo').value.trim() };
+  const body={ name, tipo, color:document.getElementById('mCardColor').value };
   if(tipo==='benefit'){
     body.benefit_value=parseFloat(document.getElementById('mCardBenVal').value)||0;
   } else {
