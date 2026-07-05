@@ -479,6 +479,12 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
       <div><div class="page-title">Cartoes e beneficios</div><div class="page-sub">faturas, compras e saldos do mes</div></div>
       <button class="btn btn-primary btn-sm" onclick="openCardModal()">+ Novo cartao</button>
     </div>
+    <div class="subtabs" style="margin-bottom:10px;">
+      <button class="subtab active" id="cardTabAll" onclick="setCardFilter('all')">Todos</button>
+      <button class="subtab" id="cardTabCredit" onclick="setCardFilter('credit')">Credito</button>
+      <button class="subtab" id="cardTabBenefit" onclick="setCardFilter('benefit')">Beneficios</button>
+    </div>
+    <select id="cardPick" onchange="S.cardFilter.id=this.value;renderCards();" style="display:none;width:100%;margin-bottom:12px;padding:9px 11px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:13px;background:var(--white);color:var(--text-1);"></select>
     <div id="ccList"></div>
   </div>
 
@@ -828,6 +834,7 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
       </div>
       <div class="fg"><label>Cor</label><input type="color" id="mCardColor" value="#8B5CF6"></div>
     </div>
+    <div class="fg"><label>Rotulo do tipo (opcional)</label><input type="text" id="mCardRotulo" placeholder="Ex: VR, iFood, Home office, Black"></div>
     <div id="cardCreditFields">
       <div class="frow">
         <div class="fg"><label>Fatura atual - ajuste (R$)</label><input type="number" id="mCardExtra" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
@@ -2060,9 +2067,45 @@ async function saveRev(){
 /* ============================================================
    CARTOES DE CREDITO - VIEW
    ============================================================ */
+function setCardFilter(tipo){
+  S.cardFilter={tipo, id:'all'};
+  renderCards();
+}
+
 function renderCards(){
-  const creditCards=S.cards.filter(c=>cardTipo(c)==='credit');
-  const benefitCards=S.cards.filter(c=>cardTipo(c)==='benefit');
+  if(!S.cardFilter) S.cardFilter={tipo:'all', id:'all'};
+  const f=S.cardFilter;
+
+  /* sub-abas */
+  const tabs={all:'cardTabAll', credit:'cardTabCredit', benefit:'cardTabBenefit'};
+  Object.entries(tabs).forEach(([t,id])=>{
+    const el=document.getElementById(id);
+    if(el) el.classList.toggle('active', f.tipo===t);
+  });
+
+  /* sub-filtro: escolher o cartao dentro do tipo */
+  const pick=document.getElementById('cardPick');
+  if(pick){
+    if(f.tipo==='all'){
+      pick.style.display='none';
+    } else {
+      pick.style.display='';
+      const list=S.cards.filter(c=>cardTipo(c)===f.tipo);
+      if(f.id!=='all' && !list.some(c=>c.id===f.id)) f.id='all';
+      pick.innerHTML=`<option value="all">${f.tipo==='credit'?'Todos os cartoes de credito':'Todos os beneficios'}</option>`
+        +list.map(c=>`<option value="${c.id}">${escHtml(c.name)}${c.rotulo?' · '+escHtml(c.rotulo):''}</option>`).join('');
+      pick.value=f.id;
+    }
+  }
+
+  const detailed = f.tipo!=='all' && f.id!=='all'; /* um cartao especifico: mostra historico completo */
+  const visivel=c=>{
+    if(f.tipo!=='all' && cardTipo(c)!==f.tipo) return false;
+    if(f.id!=='all' && c.id!==f.id) return false;
+    return true;
+  };
+  const creditCards=S.cards.filter(c=>cardTipo(c)==='credit'&&visivel(c));
+  const benefitCards=S.cards.filter(c=>cardTipo(c)==='benefit'&&visivel(c));
   const creditHtml = creditCards.length===0
     ? '<div style="color:var(--text-3);font-size:12px;margin-bottom:6px;">Nenhum cartao de credito cadastrado.</div>'
     : creditCards.map(c=>{
@@ -2072,12 +2115,12 @@ function renderCards(){
         const closedVal=invoiceValue(c,ymClosed);
         const closedPaid=isPaid(c.id,ymClosed);
         const rc=cycleRange(c,ymClosed), ro=cycleRange(c,ymOpen);
-        const recent=S.cardTx.filter(t=>t.card_id===c.id).slice(0,5);
+        const recent=S.cardTx.filter(t=>t.card_id===c.id).slice(0,detailed?500:5);
         return `<div class="cc-card">
           <div class="cc-band" style="background:${c.color};"></div>
           <div class="cc-body">
             <div class="cc-head">
-              <div class="cc-name">${escHtml(c.name)}</div>
+              <div class="cc-name">${escHtml(c.name)}${c.rotulo?` <span class="tag tag-paid" style="margin-left:5px;font-size:9px;">${escHtml(c.rotulo)}</span>`:''}</div>
               <div style="display:flex;gap:6px;">
                 <button class="btn btn-secondary btn-sm" onclick="openCardModal('${c.id}')">Editar</button>
                 <button class="btn btn-secondary btn-sm" onclick="delCard('${c.id}')">&#10005;</button>
@@ -2109,7 +2152,8 @@ function renderCards(){
             </div>
             ${recent.length>0?`
             <div style="margin-top:12px;">
-              <div style="font-size:10px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Ultimas compras</div>
+              <div style="font-size:10px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">${detailed?`Historico de compras (${recent.length})`:'Ultimas compras'}</div>
+              <div ${detailed?'class="scrolly" style="max-height:45vh;"':''}>
               ${recent.map(t=>{
                 const n=Math.max(1,Number(t.parcelas)||1);
                 return `<div class="tx-item">
@@ -2121,6 +2165,7 @@ function renderCards(){
                   <button class="tx-del" onclick="delCcTx('${t.id}')" aria-label="Remover">&#10005;</button>
                 </div>`;
               }).join('')}
+              </div>
             </div>`:''}
           </div>
         </div>`;
@@ -2131,12 +2176,12 @@ function renderCards(){
     : benefitCards.map(c=>{
         const b=benefitBalance(c);
         const pct=b.total>0?Math.min(100,Math.max(b.gasto/b.total*100,0)):0;
-        const recent=S.cardTx.filter(t=>t.card_id===c.id).slice(0,5);
+        const recent=S.cardTx.filter(t=>t.card_id===c.id).slice(0,detailed?500:5);
         return `<div class="cc-card">
           <div class="cc-band" style="background:${c.color};"></div>
           <div class="cc-body">
             <div class="cc-head">
-              <div class="cc-name">${escHtml(c.name)}</div>
+              <div class="cc-name">${escHtml(c.name)}${c.rotulo?` <span class="tag tag-paid" style="margin-left:5px;font-size:9px;">${escHtml(c.rotulo)}</span>`:''}</div>
               <div style="display:flex;gap:6px;">
                 <button class="btn btn-secondary btn-sm" onclick="openCardModal('${c.id}')">Editar</button>
                 <button class="btn btn-secondary btn-sm" onclick="delCard('${c.id}')">&#10005;</button>
@@ -2159,7 +2204,8 @@ function renderCards(){
             </div>
             ${recent.length>0?`
             <div style="margin-top:12px;">
-              <div style="font-size:10px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Ultimas compras</div>
+              <div style="font-size:10px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">${detailed?`Historico de compras (${recent.length})`:'Ultimas compras'}</div>
+              <div ${detailed?'class="scrolly" style="max-height:45vh;"':''}>
               ${recent.map(t=>`<div class="tx-item">
                   <div class="tx-info">
                     <div class="tx-desc">${escHtml(t.descricao)}</div>
@@ -2168,14 +2214,22 @@ function renderCards(){
                   <div class="tx-amount">-${fmt(t.valor)}</div>
                   <button class="tx-del" onclick="delCcTx('${t.id}')" aria-label="Remover">&#10005;</button>
                 </div>`).join('')}
+              </div>
             </div>`:''}
           </div>
         </div>`;
       }).join('');
 
-  document.getElementById('ccList').innerHTML =
-    `<div class="card-label" style="margin:2px 0 10px;">Cartoes de credito</div>`+creditHtml+
-    `<div class="card-label" style="margin:20px 0 10px;">Cartoes beneficio</div>`+benefitHtml;
+  let out='';
+  if(f.tipo!=='benefit'){
+    if(f.tipo==='all') out+=`<div class="card-label" style="margin:2px 0 10px;">Cartoes de credito</div>`;
+    out+=creditHtml;
+  }
+  if(f.tipo!=='credit'){
+    if(f.tipo==='all') out+=`<div class="card-label" style="margin:20px 0 10px;">Cartoes beneficio</div>`;
+    out+=benefitHtml;
+  }
+  document.getElementById('ccList').innerHTML=out;
 }
 
 async function toggleCardDash(id, show){
@@ -2205,6 +2259,7 @@ function openCardModal(id){
   document.getElementById('mCardDue').value = c ? c.due_day : '';
   document.getElementById('mCardTipo').value = c ? cardTipo(c) : 'credit';
   document.getElementById('mCardBenVal').value = c ? (Number(c.benefit_value)||'') : '';
+  document.getElementById('mCardRotulo').value = c ? (c.rotulo||'') : '';
   onCardTipoChange();
   openM('modalCard');
 }
@@ -2215,7 +2270,7 @@ async function saveCard(){
   const name=document.getElementById('mCardName').value.trim();
   const tipo=document.getElementById('mCardTipo').value;
   if(!name){toast('Informe o nome do cartao','err');return;}
-  const body={ name, tipo, color:document.getElementById('mCardColor').value };
+  const body={ name, tipo, color:document.getElementById('mCardColor').value, rotulo:document.getElementById('mCardRotulo').value.trim() };
   if(tipo==='benefit'){
     body.benefit_value=parseFloat(document.getElementById('mCardBenVal').value)||0;
   } else {
