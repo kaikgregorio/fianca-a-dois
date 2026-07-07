@@ -1030,16 +1030,30 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
 <div id="loginScreen">
   <div class="login-card">
     <div class="login-err" id="loginErr"></div>
+    <div class="login-ok" id="loginOk" style="display:none;background:rgba(76,175,125,.12);color:var(--green);font-size:12px;border-radius:var(--r-sm);padding:9px 11px;margin-bottom:12px;"></div>
     <div class="fg"><label>E-mail</label><input type="email" id="loginEmail" placeholder="voce@email.com" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()"></div>
     <div class="fg"><label>Senha</label>
       <div class="pass-wrap">
-        <input type="password" id="loginPass" placeholder="Sua senha" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+        <input type="password" id="loginPass" placeholder="Sua senha" autocomplete="current-password" onkeydown="if(event.key==='Enter')authSubmit()">
         <button type="button" class="pass-eye" onclick="togglePass()" aria-label="Mostrar senha">
           <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
       </div>
     </div>
-    <button class="btn btn-primary" id="loginBtn" style="width:100%;margin-top:6px;" onclick="doLogin()">Entrar</button>
+    <div class="fg" id="loginPass2Wrap" style="display:none;"><label>Confirmar senha</label>
+      <input type="password" id="loginPass2" placeholder="Repita a senha" autocomplete="new-password" onkeydown="if(event.key==='Enter')authSubmit()">
+    </div>
+    <button class="btn btn-primary" id="loginBtn" style="width:100%;margin-top:6px;" onclick="authSubmit()">Entrar</button>
+    <button class="btn btn-secondary" id="authModeBtn" style="width:100%;margin-top:8px;" onclick="toggleAuthMode()">Criar conta</button>
+    <div style="text-align:center;margin-top:14px;">
+      <a href="#" onclick="toggleLoginCfg();return false;" style="font-size:11.5px;color:var(--text-3);">Configurar conexao (Supabase)</a>
+    </div>
+    <div id="loginCfg" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:14px;">
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:10px;">Cada usuario usa o proprio projeto Supabase — seus dados ficam so no seu banco, sem misturar com os de ninguem.</div>
+      <div class="fg"><label>URL do projeto Supabase</label><input type="text" id="loginSbUrl" placeholder="https://xxxx.supabase.co"></div>
+      <div class="fg"><label>Chave anon (public)</label><input type="text" id="loginSbKey" placeholder="eyJhbGci..."></div>
+      <button class="btn btn-secondary btn-sm" style="width:100%;" onclick="saveLoginCfg()">Salvar conexao</button>
+    </div>
   </div>
 </div>
 
@@ -1236,6 +1250,94 @@ async function doLogin(){
     err.textContent='Falha de conexao. Tente novamente.';
     err.style.display='block';
   }finally{ btn.disabled=false; btn.textContent='Entrar'; }
+}
+
+let AUTH_MODE='login';
+function toggleAuthMode(){
+  AUTH_MODE = AUTH_MODE==='login' ? 'signup' : 'login';
+  const signup=AUTH_MODE==='signup';
+  document.getElementById('loginPass2Wrap').style.display=signup?'':'none';
+  document.getElementById('loginBtn').textContent=signup?'Criar conta':'Entrar';
+  document.getElementById('authModeBtn').textContent=signup?'Ja tenho conta':'Criar conta';
+  document.getElementById('loginErr').style.display='none';
+  document.getElementById('loginOk').style.display='none';
+}
+function authSubmit(){ AUTH_MODE==='signup' ? doSignup() : doLogin(); }
+
+async function doSignup(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  const pass2=document.getElementById('loginPass2').value;
+  const err=document.getElementById('loginErr');
+  const okBox=document.getElementById('loginOk');
+  err.style.display='none'; okBox.style.display='none';
+  if(!sbReady()){ err.textContent='Antes de criar a conta, configure a conexao com o SEU projeto Supabase no link abaixo.'; err.style.display='block'; return; }
+  if(!email||!pass){ err.textContent='Preencha e-mail e senha.'; err.style.display='block'; return; }
+  if(pass.length<6){ err.textContent='A senha precisa ter pelo menos 6 caracteres.'; err.style.display='block'; return; }
+  if(pass!==pass2){ err.textContent='As senhas nao conferem.'; err.style.display='block'; return; }
+  const btn=document.getElementById('loginBtn');
+  btn.disabled=true; btn.textContent='Criando conta...';
+  try{
+    const r=await fetch(`${CFG.sbUrl}/auth/v1/signup`,{
+      method:'POST',
+      headers:{'apikey':CFG.sbKey,'Content-Type':'application/json'},
+      body:JSON.stringify({email,password:pass})
+    });
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){
+      const msg=(d.error_description||d.msg||'').toLowerCase();
+      err.textContent = msg.includes('signup')&&msg.includes('disabled')
+        ? 'Cadastros estao desativados neste projeto Supabase. Ative em Authentication > Sign In / Providers, ou crie o usuario manualmente no painel.'
+        : msg.includes('already')||msg.includes('registered')
+          ? 'Este e-mail ja tem conta. Toque em "Ja tenho conta" para entrar.'
+          : (d.error_description||d.msg||'Nao foi possivel criar a conta.');
+      err.style.display='block';
+      return;
+    }
+    if(d.access_token){
+      /* confirmacao automatica ativa: ja entra */
+      saveSession({
+        access_token:d.access_token,
+        refresh_token:d.refresh_token,
+        expires_at:d.expires_at||Math.floor(Date.now()/1000)+(d.expires_in||3600),
+        email:(d.user&&d.user.email)||email
+      });
+      document.getElementById('loginPass').value='';
+      document.getElementById('loginPass2').value='';
+      hideLogin();
+      updateAccountUI();
+      await loadAll();
+    } else {
+      okBox.textContent='Conta criada! Verifique seu e-mail para confirmar o cadastro e depois entre com sua senha.';
+      okBox.style.display='block';
+      toggleAuthMode();
+    }
+  }catch(e){
+    console.error(e);
+    err.textContent='Falha de conexao. Verifique a URL do Supabase e tente de novo.';
+    err.style.display='block';
+  }finally{ btn.disabled=false; btn.textContent=AUTH_MODE==='signup'?'Criar conta':'Entrar'; }
+}
+
+function toggleLoginCfg(){
+  const box=document.getElementById('loginCfg');
+  const show=box.style.display==='none';
+  box.style.display=show?'':'none';
+  if(show){
+    document.getElementById('loginSbUrl').value=CFG.sbUrl||'';
+    document.getElementById('loginSbKey').value=CFG.sbKey||'';
+  }
+}
+
+function saveLoginCfg(){
+  const url=document.getElementById('loginSbUrl').value.trim().replace(/\/+$/,'');
+  const key=document.getElementById('loginSbKey').value.trim();
+  if(!url||!key){ toast('Preencha a URL e a chave anon','err'); return; }
+  CFG.sbUrl=url; CFG.sbKey=key;
+  localStorage.setItem(CFG_KEY, JSON.stringify(CFG));
+  saveSession(null); /* sessao antiga nao vale em outro projeto */
+  toast('Conexao salva! Agora entre ou crie sua conta.','ok');
+  toggleLoginCfg();
 }
 
 async function doLogout(){
@@ -1763,16 +1865,18 @@ function renderDash(){
     const n=Math.max(1,Number(t.parcelas)||1);
     const firstYm=firstInvoiceYm(card,t.data);
     const openYm=currentOpenYm(card);
-    const paid=Math.min(Math.max(openYm-firstYm,0),n);   /* parcelas em faturas ja fechadas */
+    /* parcela so conta como paga quando a fatura dela foi marcada como paga */
+    const parcelasYm=Array.from({length:n},(_,k)=>firstYm+k);
+    const paid=parcelasYm.filter(ym=>isPaid(t.card_id,ym)).length;
     const left=n-paid;
-    const nextYm=Math.max(firstYm,openYm);               /* fatura da proxima parcela */
-    return {...t,card,n,paid,left,nextYm,active:(firstYm+n-1)>=openYm};
+    const nextYm=parcelasYm.find(ym=>!isPaid(t.card_id,ym)) ?? (firstYm+n-1);
+    return {...t,card,n,paid,left,nextYm,openYm,active:left>0};
   }).filter(t=>t&&t.active).sort((a,b)=>b.left-a.left);
   document.getElementById('installments').innerHTML = activeParc.length===0
     ? '<div style="color:var(--text-3);font-size:12px;">Nenhuma compra no cartao em andamento.</div>'
     : activeParc.slice(0,7).map(t=>{
         const range=cycleRange(t.card,t.nextYm);
-        const qualFat=t.nextYm===currentOpenYm(t.card)?'fatura atual':'proxima fatura';
+        const qualFat=t.nextYm<t.openYm?'fatura fechada, aguardando pagamento':(t.nextYm===t.openYm?'fatura atual':'proxima fatura');
         if(t.n===1) return `
       <div style="margin-bottom:11px;">
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;gap:8px;">
@@ -3786,9 +3890,8 @@ async function init(){
   applyTheme();
   updateAccountUI();
   if(!sbReady()){
-    setBanner('setup');
-    setTimeout(()=>toast('Bem-vindos! Configure o Supabase em Configuracoes para comecar.','warn'),700);
-    go('settings');
+    showLogin();
+    setTimeout(()=>toast('Bem-vindo! Toque em "Configurar conexao" para ligar o app ao seu Supabase.','warn'),600);
     return;
   }
   if(!SESSION){ showLogin(); return; }
