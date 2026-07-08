@@ -425,8 +425,8 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
     </div>
     <div class="g4" id="statsGrid"></div>
     <div class="g2">
-      <div class="card"><div class="card-label">Gasto por pessoa</div><div id="partnerBars"></div></div>
       <div class="card"><div class="card-label">Limites por categoria</div><div id="catLimits"></div></div>
+      <div class="card"><div class="card-label">Por categoria e forma de pagamento</div><div id="catByMethod"></div></div>
     </div>
     <div class="g2">
       <div class="card"><div class="card-label">Formas de pagamento (mes)</div><div id="payMethods"></div></div>
@@ -1053,6 +1053,20 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
       <div class="fg"><label>URL do projeto Supabase</label><input type="text" id="loginSbUrl" placeholder="https://xxxx.supabase.co"></div>
       <div class="fg"><label>Chave anon (public)</label><input type="text" id="loginSbKey" placeholder="eyJhbGci..."></div>
       <button class="btn btn-secondary btn-sm" style="width:100%;" onclick="saveLoginCfg()">Salvar conexao</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     MODAL: DETALHAMENTO DOS GASTOS DO MES
+     ============================================================ -->
+<div class="overlay" id="modalGastos" style="display:none;">
+  <div class="modal">
+    <div class="modal-grip"></div>
+    <div class="modal-title" id="mGastosTitle">Gastos do mes</div>
+    <div id="mGastosBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeM('modalGastos')" style="width:100%;">Fechar</button>
     </div>
   </div>
 </div>
@@ -1764,6 +1778,40 @@ function populateDashMonths(){
   el.innerHTML=list.map(mk=>`<option value="${mk}" ${mk===cur?'selected':''}>${monthLabel(mk)}</option>`).join('');
 }
 
+function openGastosDetail(){
+  const mk=S.dashMk||monthKey();
+  const mTx=S.tx.filter(t=>inMonth(t.data,mk));
+  const cardOf=id=>S.cards.find(x=>x.id===id);
+  const pixDireto=mTx.filter(t=>t.metodo!=='credit'&&t.metodo!=='benefit'&&!isFaturaTx(t)).reduce((s,t)=>s+Number(t.valor),0);
+  const faturas=mTx.filter(t=>isFaturaTx(t)).reduce((s,t)=>s+Number(t.valor),0);
+  const credito=S.cardTx.filter(t=>inMonth(t.data,mk)&&cardTipo(cardOf(t.card_id))==='credit').reduce((s,t)=>s+Number(t.valor),0);
+  const beneficio=S.cardTx.filter(t=>inMonth(t.data,mk)&&cardTipo(cardOf(t.card_id))==='benefit').reduce((s,t)=>s+Number(t.valor),0);
+  const saiu=pixDireto+faturas;
+  const linha=(nome,val,cor,nota)=>`
+    <div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;font-size:13px;">
+      <span>${nome}${nota?`<br><span style="font-size:10.5px;color:var(--text-3);">${nota}</span>`:''}</span>
+      <b style="color:${cor};white-space:nowrap;">${fmt(val)}</b>
+    </div>`;
+  document.getElementById('mGastosTitle').textContent=`Gastos de ${monthLabel(mk)}`;
+  document.getElementById('mGastosBody').innerHTML=`
+    <div style="font-size:10px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Saiu da conta — ${fmt(saiu)}</div>
+    ${linha('Pix / Debito',pixDireto,'var(--red)','compras e contas pagas direto da conta')}
+    ${linha('Faturas de cartao pagas',faturas,'var(--red)','pagamento das faturas no mes')}
+    <div style="font-size:10px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 2px;">Nao saiu da conta</div>
+    ${linha('Compras no credito',credito,'#8B5CF6','entram nas faturas — descontam da conta quando a fatura for paga')}
+    ${beneficio>0?linha('Cartao beneficio',beneficio,'var(--amber)','desconta do saldo do beneficio, nao da conta'):''}
+    <div style="display:flex;justify-content:space-between;gap:10px;padding:10px 0 2px;font-size:13px;border-top:1px solid var(--border);margin-top:10px;">
+      <b>Total movimentado no mes</b>
+      <b style="white-space:nowrap;">${fmt(pixDireto+faturas+credito+beneficio)}</b>
+    </div>
+    <div style="font-size:10.5px;color:var(--text-3);margin-top:4px;">Obs: compras no credito e faturas pagas sao coisas diferentes — a fatura paga quita compras de meses anteriores.</div>`;
+  openM('modalGastos');
+}
+
+function isFaturaTx(t){
+  return t.metodo!=='credit' && t.metodo!=='benefit' && !t.card_id && String(t.descricao||'').startsWith('Fatura ');
+}
+
 function renderDash(){
   if(!S.dashMk) S.dashMk=monthKey();
   populateDashMonths();
@@ -1788,30 +1836,15 @@ function renderDash(){
 
   document.getElementById('statsGrid').innerHTML=`
     <div class="stat-card"><div class="stat-label">Receitas</div><div class="stat-val green">${fmt(totRev)}</div><div class="stat-note">${lbl}</div></div>
-    <div class="stat-card"><div class="stat-label">Gastos</div><div class="stat-val red">${fmt(totExp)}</div><div class="stat-note">fixas ${fmt(fixed)} + var. ${fmt(vary)}${credMes>0?` · credito ${fmt(credMes)} (desconta ao pagar a fatura)`:''}</div></div>
+    <div class="stat-card" onclick="openGastosDetail()" style="cursor:pointer;"><div class="stat-label">Gastos <span style="font-weight:500;color:var(--text-3);text-transform:none;letter-spacing:0;">· toque para detalhar</span></div><div class="stat-val red">${fmt(totExp)}</div><div class="stat-note">fixas ${fmt(fixed)} + var. ${fmt(vary)}${credMes>0?` · credito ${fmt(credMes)} (desconta ao pagar a fatura)`:''}</div></div>
     <div class="stat-card"><div class="stat-label">Saldo em conta</div><div class="stat-val ${saldoConta>=0?'green':'red'}">${fmt(saldoConta)}</div><div class="stat-note">acumulado de todas as receitas e gastos</div></div>
     <div class="stat-card"><div class="stat-label">Lancamentos</div><div class="stat-val">${mTx.length}</div><div class="stat-note">registros em ${lbl}</div></div>`;
 
-  const p0=mTx.filter(t=>String(t.pessoa)==='0').reduce((s,t)=>s+Number(t.valor),0);
-  const p1=mTx.filter(t=>String(t.pessoa)==='1').reduce((s,t)=>s+Number(t.valor),0);
-  const both=mTx.filter(t=>t.pessoa==='both').reduce((s,t)=>s+Number(t.valor),0);
-  const mx=Math.max(p0+both/2,p1+both/2,1);
-  document.getElementById('partnerBars').innerHTML=`
-    <div class="p-bar">
-      <div class="p-name">${escHtml(pn(0))}</div>
-      <div class="p-track"><div class="p-fill" style="width:${Math.min(100,(p0+both/2)/mx*100).toFixed(0)}%;background:var(--green);"></div></div>
-      <div class="p-amt">${fmt(p0+both/2)}</div>
-    </div>
-    <div class="p-bar">
-      <div class="p-name">${escHtml(pn(1))}</div>
-      <div class="p-track"><div class="p-fill" style="width:${Math.min(100,(p1+both/2)/mx*100).toFixed(0)}%;background:#3B82F6;"></div></div>
-      <div class="p-amt">${fmt(p1+both/2)}</div>
-    </div>
-    ${both>0?`<div style="font-size:11px;color:var(--text-3);margin-top:6px;">Compartilhado: ${fmt(both)}</div>`:''}`;
-
-  const maxSpentCat=Math.max(...S.cats.map(c=>mTx.filter(t=>t.cat_id===c.id).reduce((s,t)=>s+Number(t.valor),0)),1);
+  /* limites: pagamentos de fatura ficam de fora para nao inflar as categorias */
+  const mTxCat=mTx.filter(t=>!isFaturaTx(t));
+  const maxSpentCat=Math.max(...S.cats.map(c=>mTxCat.filter(t=>t.cat_id===c.id).reduce((s,t)=>s+Number(t.valor),0)),credMes,1);
   const limHtml = S.cats.map(c=>{
-    const spent=mTx.filter(t=>t.cat_id===c.id).reduce((s,t)=>s+Number(t.valor),0);
+    const spent=mTxCat.filter(t=>t.cat_id===c.id).reduce((s,t)=>s+Number(t.valor),0);
     if(c.limit>0){
       const pct=Math.min(100,(spent/c.limit)*100);
       const realPct=((spent/c.limit)*100).toFixed(0);
@@ -1832,7 +1865,57 @@ function renderDash(){
       <div class="prog-track"><div class="prog-fill" style="width:${(spent/maxSpentCat*100).toFixed(0)}%;background:${c.color};opacity:.55;"></div></div>
     </div>`;
   }).join('')||'<div style="color:var(--text-3);font-size:12px;">Nenhuma categoria cadastrada.</div>';
-  document.getElementById('catLimits').innerHTML=limHtml;
+  /* linha extra: total de compras no credito (todos os cartoes), sem pagamentos de fatura */
+  const linhaCartoes=`<div style="margin-bottom:11px;padding-top:10px;border-top:1px dashed var(--border);">
+    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;gap:8px;">
+      <span style="font-weight:600;">Gastos cartoes (credito)</span>
+      <span style="color:var(--text-2);white-space:nowrap;">${fmt(credMes)} · todos os cartoes</span>
+    </div>
+    <div class="prog-track"><div class="prog-fill" style="width:${(credMes/maxSpentCat*100).toFixed(0)}%;background:#8B5CF6;"></div></div>
+  </div>`;
+  document.getElementById('catLimits').innerHTML=limHtml+linhaCartoes;
+
+  /* por categoria e forma de pagamento (sem pagamentos de fatura) */
+  const benMes=S.cardTx.filter(t=>inMonth(t.data,mk)&&cardTipo(S.cards.find(x=>x.id===t.card_id))==='benefit').reduce((s,t)=>s+Number(t.valor),0);
+  const temBen=benMes>0 || mTxCat.some(t=>t.metodo==='benefit');
+  const catRows=S.cats.map(c=>{
+    const deb=mTxCat.filter(t=>t.cat_id===c.id&&t.metodo!=='credit'&&t.metodo!=='benefit').reduce((s,t)=>s+Number(t.valor),0);
+    const cre=mTxCat.filter(t=>t.cat_id===c.id&&t.metodo==='credit').reduce((s,t)=>s+Number(t.valor),0);
+    const ben=mTxCat.filter(t=>t.cat_id===c.id&&t.metodo==='benefit').reduce((s,t)=>s+Number(t.valor),0);
+    return {c,deb,cre,ben,tot:deb+cre+ben};
+  }).filter(r=>r.tot>0.005);
+  /* compras feitas direto na aba Cartoes (sem categoria) */
+  const creCat=catRows.reduce((s,r)=>s+r.cre,0);
+  const benCat=catRows.reduce((s,r)=>s+r.ben,0);
+  const creDireto=Math.max(credMes-creCat,0);
+  const benDireto=Math.max(benMes-benCat,0);
+  const cell=(v,cor)=>`<div style="text-align:right;font-variant-numeric:tabular-nums;color:${v>0.005?cor:'var(--text-3)'};">${v>0.005?fmt(v):'—'}</div>`;
+  const gridCols=temBen?'1.4fr .9fr .9fr .9fr':'1.6fr 1fr 1fr';
+  document.getElementById('catByMethod').innerHTML = catRows.length===0 && creDireto<0.005 && benDireto<0.005
+    ? '<div style="color:var(--text-3);font-size:12px;">Nenhum gasto registrado neste mes.</div>'
+    : `<div style="display:grid;grid-template-columns:${gridCols};gap:4px 8px;font-size:12px;align-items:center;">
+        <div style="font-size:9.5px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;">Categoria</div>
+        <div style="font-size:9.5px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;text-align:right;">Debito</div>
+        <div style="font-size:9.5px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;text-align:right;">Credito</div>
+        ${temBen?'<div style="font-size:9.5px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;text-align:right;">Benef.</div>':''}
+        ${catRows.map(r=>`
+          <div style="display:flex;align-items:center;gap:6px;min-width:0;"><span style="width:8px;height:8px;border-radius:3px;background:${r.c.color};flex-shrink:0;"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(r.c.name)}</span></div>
+          ${cell(r.deb,'var(--text-1)')}
+          ${cell(r.cre,'#8B5CF6')}
+          ${temBen?cell(r.ben,'var(--amber)'):''}
+        `).join('')}
+        ${(creDireto>0.005||benDireto>0.005)?`
+          <div style="color:var(--text-2);">Direto no cartao <span style="font-size:10px;color:var(--text-3);">(sem categoria)</span></div>
+          ${cell(0,'var(--text-1)')}
+          ${cell(creDireto,'#8B5CF6')}
+          ${temBen?cell(benDireto,'var(--amber)'):''}
+        `:''}
+        <div style="border-top:1px solid var(--border);padding-top:6px;font-weight:700;">Total</div>
+        <div style="border-top:1px solid var(--border);padding-top:6px;text-align:right;font-weight:700;">${fmt(catRows.reduce((s,r)=>s+r.deb,0))}</div>
+        <div style="border-top:1px solid var(--border);padding-top:6px;text-align:right;font-weight:700;color:#8B5CF6;">${fmt(credMes)}</div>
+        ${temBen?`<div style="border-top:1px solid var(--border);padding-top:6px;text-align:right;font-weight:700;color:var(--amber);">${fmt(benMes)}</div>`:''}
+      </div>
+      <div style="font-size:10px;color:var(--text-3);margin-top:8px;">Debito = saiu da conta · Credito = vai para a fatura · Benef. = desconta do saldo do beneficio. Pagamentos de fatura nao entram aqui.</div>`;
 
   /* formas de pagamento do mes */
   const totPix=mTx.filter(t=>t.metodo!=='credit'&&t.metodo!=='benefit').reduce((s,t)=>s+Number(t.valor),0);
@@ -1855,8 +1938,7 @@ function renderDash(){
         <div class="p-name">Beneficio</div>
         <div class="p-track"><div class="p-fill" style="width:${(totBen/totPm*100).toFixed(0)}%;background:#F59E0B;"></div></div>
         <div class="p-amt">${fmt(totBen)}</div>
-      </div>`:''}
-      <div style="font-size:11px;color:var(--text-3);margin-top:6px;">${((totCred/totPm)*100).toFixed(0)}% dos gastos do mes foram no credito</div>`;
+      </div>`:''}`;
 
   /* compras no cartao: parcelas organizadas pelo ciclo de fatura de cada cartao */
   const activeParc=S.cardTx.map(t=>{
@@ -1875,15 +1957,15 @@ function renderDash(){
   document.getElementById('installments').innerHTML = activeParc.length===0
     ? '<div style="color:var(--text-3);font-size:12px;">Nenhuma compra no cartao em andamento.</div>'
     : activeParc.slice(0,7).map(t=>{
-        const range=cycleRange(t.card,t.nextYm);
-        const qualFat=t.nextYm<t.openYm?'fatura fechada, aguardando pagamento':(t.nextYm===t.openYm?'fatura atual':'proxima fatura');
+        const aguardando=t.nextYm<t.openYm; /* fatura fechada, ainda nao paga */
+        const venc=`<span style="${aguardando?'color:var(--amber);font-weight:600;':''}">vence ${fmtDate(dueDateIso(t.card,t.nextYm))}</span>`;
         if(t.n===1) return `
       <div style="margin-bottom:11px;">
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;gap:8px;">
           <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(t.descricao)}</span>
           <span style="color:var(--text-2);white-space:nowrap;">${fmt(t.valor)} a vista</span>
         </div>
-        <div style="font-size:10px;color:var(--text-3);">${escHtml(t.card.name)} · ${qualFat}, fecha ${fmtD(range.end)}</div>
+        <div style="font-size:10px;color:var(--text-3);">${escHtml(t.card.name)} · ${venc}</div>
       </div>`;
         return `
       <div style="margin-bottom:11px;">
@@ -1892,7 +1974,7 @@ function renderDash(){
           <span style="color:var(--text-2);white-space:nowrap;">${t.paid}/${t.n} pagas · ${fmt(Number(t.valor)/t.n)}/mes</span>
         </div>
         <div class="prog-track"><div class="prog-fill" style="width:${(t.paid/t.n*100).toFixed(0)}%;background:#8B5CF6;"></div></div>
-        <div style="font-size:10px;color:var(--text-3);margin-top:3px;">${escHtml(t.card.name)} · faltam ${t.left} parcela${t.left>1?'s':''} (${fmt(Number(t.valor)/t.n*t.left)}) · proxima na ${qualFat}, fecha ${fmtD(range.end)}</div>
+        <div style="font-size:10px;color:var(--text-3);margin-top:3px;">${escHtml(t.card.name)} · faltam ${t.left}x (${fmt(Number(t.valor)/t.n*t.left)}) · ${venc}</div>
       </div>`;
       }).join('');
 
