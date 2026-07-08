@@ -425,17 +425,14 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
     </div>
     <div class="g4" id="statsGrid"></div>
     <div class="g2">
-      <div class="card"><div class="card-label">Limites por categoria</div><div id="catLimits"></div></div>
-      <div class="card"><div class="card-label">Por categoria e forma de pagamento</div><div id="catByMethod"></div></div>
-    </div>
-    <div class="g2">
+      <div class="card"><div class="card-label">Limites por categoria <span style="font-weight:500;color:var(--text-3);text-transform:none;letter-spacing:0;">· toque para detalhar</span></div><div id="catLimits"></div></div>
       <div class="card"><div class="card-label">Formas de pagamento (mes)</div><div id="payMethods"></div></div>
-      <div class="card"><div class="card-label">Compras no cartao</div><div id="installments"></div></div>
     </div>
     <div class="g2">
+      <div class="card"><div class="card-label">Compras no cartao</div><div id="installments"></div></div>
       <div class="card"><div class="card-label">Faturas dos cartoes</div><div id="dashCards"></div></div>
-      <div class="card"><div class="card-label">Lancamentos do mes</div><div id="recentTx" style="max-height:380px;overflow-y:auto;padding-right:2px;"></div></div>
     </div>
+    <div class="card"><div class="card-label">Lancamentos do mes</div><div id="recentTx" style="max-height:380px;overflow-y:auto;padding-right:2px;"></div></div>
   </div>
 
   <!-- GASTOS -->
@@ -865,6 +862,10 @@ input,select,textarea{font-family:'Inter',sans-serif;font-size:16px;} /* 16px ev
     <div class="modal-title" id="mCcTxTitle">Compra no cartao</div>
     <input type="hidden" id="mCcTxCardId">
     <div class="fg"><label>Descricao</label><input type="text" id="mCcTxDesc" placeholder="Ex: Tenis novo"></div>
+    <div class="frow">
+      <div class="fg"><label>Categoria</label><select id="mCcTxCat" onchange="updateSubs('mCcTxSub','mCcTxCat')"></select></div>
+      <div class="fg"><label>Subcategoria</label><select id="mCcTxSub" onchange="handleNewSub('mCcTxSub','mCcTxCat')"></select></div>
+    </div>
     <div class="frow">
       <div class="fg"><label>Valor total (R$)</label><input type="number" id="mCcTxAmt" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
       <div class="fg"><label>Data da compra</label><input type="date" id="mCcTxDate" onchange="updateCcTxHint()"></div>
@@ -1808,6 +1809,51 @@ function openGastosDetail(){
   openM('modalGastos');
 }
 
+function openCatDetail(catId){
+  const c=S.cats.find(x=>x.id===catId); if(!c)return;
+  const mk=S.dashMk||monthKey();
+  const cardOf=id=>S.cards.find(x=>x.id===id);
+  const catTx=S.tx.filter(t=>inMonth(t.data,mk)&&t.cat_id===catId&&!isFaturaTx(t));
+  const direto=S.cardTx.filter(t=>inMonth(t.data,mk)&&!t.tx_id&&t.cat_id===catId);
+
+  const debito=catTx.filter(t=>t.metodo!=='credit'&&t.metodo!=='benefit').reduce((s,t)=>s+Number(t.valor),0);
+
+  /* por cartao: gastos espelhados (via aba Gastos) + compras diretas na aba Cartoes */
+  const porCartao={};
+  const addCartao=(cardId,val)=>{
+    if(!cardId)return;
+    porCartao[cardId]=(porCartao[cardId]||0)+Number(val);
+  };
+  catTx.filter(t=>t.metodo==='credit'||t.metodo==='benefit').forEach(t=>addCartao(t.card_id,t.valor));
+  direto.forEach(t=>addCartao(t.card_id,t.valor));
+
+  const cartoes=Object.entries(porCartao)
+    .map(([id,val])=>({card:cardOf(id),val}))
+    .filter(x=>x.card&&x.val>0.005)
+    .sort((a,b)=>b.val-a.val);
+  const total=debito+cartoes.reduce((s,x)=>s+x.val,0);
+
+  const linha=(cor,nome,val,tag)=>`
+    <div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">
+      <span style="width:10px;height:10px;border-radius:3px;background:${cor};flex-shrink:0;"></span>
+      <span style="flex:1;">${nome}${tag?` <span class="tag tag-paid" style="font-size:9px;margin-left:4px;">${tag}</span>`:''}</span>
+      <b style="white-space:nowrap;">${fmt(val)}</b>
+    </div>`;
+
+  document.getElementById('mGastosTitle').textContent=`${c.name} — ${monthLabel(mk)}`;
+  document.getElementById('mGastosBody').innerHTML=
+    (total<0.005
+      ? '<div style="color:var(--text-3);font-size:12px;">Nenhum gasto nesta categoria neste mes.</div>'
+      : (debito>0.005?linha('var(--green)','Pix / Debito',debito):'')
+        +cartoes.map(x=>linha(x.card.color,escHtml(x.card.name),x.val,cardTipo(x.card)==='benefit'?'Beneficio':'Credito')).join('')
+        +`<div style="display:flex;justify-content:space-between;gap:10px;padding:11px 0 2px;font-size:13px;">
+            <b>Total em ${escHtml(c.name)}</b>
+            <b style="white-space:nowrap;">${fmt(total)}</b>
+          </div>`
+        +(c.limit>0?`<div style="font-size:10.5px;color:var(--text-3);margin-top:4px;">Limite do casal: ${fmt(c.limit)} — usado ${((total/c.limit)*100).toFixed(0)}%.</div>`:''));
+  openM('modalGastos');
+}
+
 function isFaturaTx(t){
   return t.metodo!=='credit' && t.metodo!=='benefit' && !t.card_id && String(t.descricao||'').startsWith('Fatura ');
 }
@@ -1840,82 +1886,36 @@ function renderDash(){
     <div class="stat-card"><div class="stat-label">Saldo em conta</div><div class="stat-val ${saldoConta>=0?'green':'red'}">${fmt(saldoConta)}</div><div class="stat-note">acumulado de todas as receitas e gastos</div></div>
     <div class="stat-card"><div class="stat-label">Lancamentos</div><div class="stat-val">${mTx.length}</div><div class="stat-note">registros em ${lbl}</div></div>`;
 
-  /* limites: pagamentos de fatura ficam de fora para nao inflar as categorias */
+  /* limites: pagamentos de fatura ficam de fora; compras de cartao com categoria entram */
   const mTxCat=mTx.filter(t=>!isFaturaTx(t));
-  const maxSpentCat=Math.max(...S.cats.map(c=>mTxCat.filter(t=>t.cat_id===c.id).reduce((s,t)=>s+Number(t.valor),0)),credMes,1);
+  const mCardDireto=S.cardTx.filter(t=>inMonth(t.data,mk)&&!t.tx_id); /* registradas direto na aba Cartoes */
+  const catSpent=cid=>
+    mTxCat.filter(t=>t.cat_id===cid).reduce((s,t)=>s+Number(t.valor),0)
+    +mCardDireto.filter(t=>t.cat_id===cid).reduce((s,t)=>s+Number(t.valor),0);
+  const maxSpentCat=Math.max(...S.cats.map(c=>catSpent(c.id)),1);
   const limHtml = S.cats.map(c=>{
-    const spent=mTxCat.filter(t=>t.cat_id===c.id).reduce((s,t)=>s+Number(t.valor),0);
+    const spent=catSpent(c.id);
     if(c.limit>0){
       const pct=Math.min(100,(spent/c.limit)*100);
       const realPct=((spent/c.limit)*100).toFixed(0);
       const col=pct>=100?'var(--red)':pct>=80?'var(--amber)':c.color;
-      return `<div style="margin-bottom:11px;">
+      return `<div style="margin-bottom:11px;cursor:pointer;" onclick="openCatDetail('${c.id}')">
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;gap:8px;">
           <span style="font-weight:500;">${escHtml(c.name)}</span>
-          <span style="color:var(--text-2);white-space:nowrap;">${fmt(spent)} / ${fmt(c.limit)} — ${realPct}%</span>
+          <span style="color:var(--text-2);white-space:nowrap;">${fmt(spent)} / ${fmt(c.limit)} — ${realPct}% <span style="color:var(--text-3);">&#8250;</span></span>
         </div>
         <div class="prog-track"><div class="prog-fill" style="width:${pct.toFixed(0)}%;background:${col};"></div></div>
       </div>`;
     }
-    return `<div style="margin-bottom:11px;">
+    return `<div style="margin-bottom:11px;cursor:pointer;" onclick="openCatDetail('${c.id}')">
       <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;gap:8px;">
         <span style="font-weight:500;">${escHtml(c.name)}</span>
-        <span style="color:var(--text-3);white-space:nowrap;">${fmt(spent)} · sem limite</span>
+        <span style="color:var(--text-3);white-space:nowrap;">${fmt(spent)} · sem limite <span>&#8250;</span></span>
       </div>
       <div class="prog-track"><div class="prog-fill" style="width:${(spent/maxSpentCat*100).toFixed(0)}%;background:${c.color};opacity:.55;"></div></div>
     </div>`;
   }).join('')||'<div style="color:var(--text-3);font-size:12px;">Nenhuma categoria cadastrada.</div>';
-  /* linha extra: total de compras no credito (todos os cartoes), sem pagamentos de fatura */
-  const linhaCartoes=`<div style="margin-bottom:11px;padding-top:10px;border-top:1px dashed var(--border);">
-    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;gap:8px;">
-      <span style="font-weight:600;">Gastos cartoes (credito)</span>
-      <span style="color:var(--text-2);white-space:nowrap;">${fmt(credMes)} · todos os cartoes</span>
-    </div>
-    <div class="prog-track"><div class="prog-fill" style="width:${(credMes/maxSpentCat*100).toFixed(0)}%;background:#8B5CF6;"></div></div>
-  </div>`;
-  document.getElementById('catLimits').innerHTML=limHtml+linhaCartoes;
-
-  /* por categoria e forma de pagamento (sem pagamentos de fatura) */
-  const benMes=S.cardTx.filter(t=>inMonth(t.data,mk)&&cardTipo(S.cards.find(x=>x.id===t.card_id))==='benefit').reduce((s,t)=>s+Number(t.valor),0);
-  const temBen=benMes>0 || mTxCat.some(t=>t.metodo==='benefit');
-  const catRows=S.cats.map(c=>{
-    const deb=mTxCat.filter(t=>t.cat_id===c.id&&t.metodo!=='credit'&&t.metodo!=='benefit').reduce((s,t)=>s+Number(t.valor),0);
-    const cre=mTxCat.filter(t=>t.cat_id===c.id&&t.metodo==='credit').reduce((s,t)=>s+Number(t.valor),0);
-    const ben=mTxCat.filter(t=>t.cat_id===c.id&&t.metodo==='benefit').reduce((s,t)=>s+Number(t.valor),0);
-    return {c,deb,cre,ben,tot:deb+cre+ben};
-  }).filter(r=>r.tot>0.005);
-  /* compras feitas direto na aba Cartoes (sem categoria) */
-  const creCat=catRows.reduce((s,r)=>s+r.cre,0);
-  const benCat=catRows.reduce((s,r)=>s+r.ben,0);
-  const creDireto=Math.max(credMes-creCat,0);
-  const benDireto=Math.max(benMes-benCat,0);
-  const cell=(v,cor)=>`<div style="text-align:right;font-variant-numeric:tabular-nums;color:${v>0.005?cor:'var(--text-3)'};">${v>0.005?fmt(v):'—'}</div>`;
-  const gridCols=temBen?'1.4fr .9fr .9fr .9fr':'1.6fr 1fr 1fr';
-  document.getElementById('catByMethod').innerHTML = catRows.length===0 && creDireto<0.005 && benDireto<0.005
-    ? '<div style="color:var(--text-3);font-size:12px;">Nenhum gasto registrado neste mes.</div>'
-    : `<div style="display:grid;grid-template-columns:${gridCols};gap:4px 8px;font-size:12px;align-items:center;">
-        <div style="font-size:9.5px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;">Categoria</div>
-        <div style="font-size:9.5px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;text-align:right;">Debito</div>
-        <div style="font-size:9.5px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;text-align:right;">Credito</div>
-        ${temBen?'<div style="font-size:9.5px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;text-align:right;">Benef.</div>':''}
-        ${catRows.map(r=>`
-          <div style="display:flex;align-items:center;gap:6px;min-width:0;"><span style="width:8px;height:8px;border-radius:3px;background:${r.c.color};flex-shrink:0;"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(r.c.name)}</span></div>
-          ${cell(r.deb,'var(--text-1)')}
-          ${cell(r.cre,'#8B5CF6')}
-          ${temBen?cell(r.ben,'var(--amber)'):''}
-        `).join('')}
-        ${(creDireto>0.005||benDireto>0.005)?`
-          <div style="color:var(--text-2);">Direto no cartao <span style="font-size:10px;color:var(--text-3);">(sem categoria)</span></div>
-          ${cell(0,'var(--text-1)')}
-          ${cell(creDireto,'#8B5CF6')}
-          ${temBen?cell(benDireto,'var(--amber)'):''}
-        `:''}
-        <div style="border-top:1px solid var(--border);padding-top:6px;font-weight:700;">Total</div>
-        <div style="border-top:1px solid var(--border);padding-top:6px;text-align:right;font-weight:700;">${fmt(catRows.reduce((s,r)=>s+r.deb,0))}</div>
-        <div style="border-top:1px solid var(--border);padding-top:6px;text-align:right;font-weight:700;color:#8B5CF6;">${fmt(credMes)}</div>
-        ${temBen?`<div style="border-top:1px solid var(--border);padding-top:6px;text-align:right;font-weight:700;color:var(--amber);">${fmt(benMes)}</div>`:''}
-      </div>
-      <div style="font-size:10px;color:var(--text-3);margin-top:8px;">Debito = saiu da conta · Credito = vai para a fatura · Benef. = desconta do saldo do beneficio. Pagamentos de fatura nao entram aqui.</div>`;
+  document.getElementById('catLimits').innerHTML=limHtml;
 
   /* formas de pagamento do mes */
   const totPix=mTx.filter(t=>t.metodo!=='credit'&&t.metodo!=='benefit').reduce((s,t)=>s+Number(t.valor),0);
@@ -2013,7 +2013,7 @@ function renderDash(){
       </div>`; }).join('');
 
   const catAlerts=S.cats.filter(c=>c.limit>0).map(c=>{
-    const sp=mTx.filter(t=>t.cat_id===c.id).reduce((s,t)=>s+Number(t.valor),0);
+    const sp=catSpent(c.id);
     const p=(sp/c.limit)*100;
     if(p>=100) return `<div class="alert alert-red">${escHtml(c.name)}: limite atingido! ${fmt(sp)} de ${fmt(c.limit)} (${p.toFixed(0)}%).</div>`;
     if(p>=80) return `<div class="alert alert-amber">${escHtml(c.name)}: ${p.toFixed(0)}% do limite estipulado — ${fmt(sp)} de ${fmt(c.limit)}.</div>`;
@@ -2175,7 +2175,7 @@ function openTxModal(id){
 async function syncCardMirror(tx){
   const mirror=S.cardTx.find(ct=>ct.tx_id===tx.id);
   if((tx.metodo==='credit'||tx.metodo==='benefit') && tx.card_id){
-    const body={card_id:tx.card_id, descricao:tx.descricao, valor:tx.valor, parcelas:tx.parcelas||1, data:tx.data, tx_id:tx.id};
+    const body={card_id:tx.card_id, descricao:tx.descricao, valor:tx.valor, cat_id:tx.cat_id||null, sub:tx.sub||'', parcelas:tx.parcelas||1, data:tx.data, tx_id:tx.id};
     if(mirror) await sb(`card_transactions?id=eq.${mirror.id}`,{method:'PATCH',body:JSON.stringify(body)});
     else await sb('card_transactions',{method:'POST',body:JSON.stringify(body)});
   } else if(mirror){
@@ -2515,6 +2515,8 @@ function openCcTxModal(cardId){
   document.getElementById('mCcTxAmt').value='';
   document.getElementById('mCcTxParc').value='1';
   document.getElementById('mCcTxDate').value=today();
+  populateCatSelect('mCcTxCat');
+  updateSubs('mCcTxSub','mCcTxCat');
   updateCcTxHint();
   openM('modalCcTx');
 }
@@ -2534,6 +2536,8 @@ async function saveCcTx(){
     await sb('card_transactions',{method:'POST',body:JSON.stringify({
       card_id:document.getElementById('mCcTxCardId').value,
       descricao:desc, valor:val,
+      cat_id:document.getElementById('mCcTxCat').value||null,
+      sub:document.getElementById('mCcTxSub').value==='__new'?'':document.getElementById('mCcTxSub').value,
       parcelas:parseInt(document.getElementById('mCcTxParc').value)||1,
       data:document.getElementById('mCcTxDate').value
     })});
