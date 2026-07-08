@@ -1809,53 +1809,88 @@ function openGastosDetail(){
   openM('modalGastos');
 }
 
-function openCatDetail(catId){
-  const c=S.cats.find(x=>x.id===catId); if(!c)return;
-  const mk=S.dashMk||monthKey();
-  const cardOf=id=>S.cards.find(x=>x.id===id);
-  const catTx=S.tx.filter(t=>inMonth(t.data,mk)&&t.cat_id===catId&&!isFaturaTx(t));
-  const direto=S.cardTx.filter(t=>inMonth(t.data,mk)&&!t.tx_id&&t.cat_id===catId);
-
-  const debito=catTx.filter(t=>t.metodo!=='credit'&&t.metodo!=='benefit').reduce((s,t)=>s+Number(t.valor),0);
-
-  /* por cartao: gastos espelhados (via aba Gastos) + compras diretas na aba Cartoes */
-  const porCartao={};
-  const addCartao=(cardId,val)=>{
-    if(!cardId)return;
-    porCartao[cardId]=(porCartao[cardId]||0)+Number(val);
-  };
-  catTx.filter(t=>t.metodo==='credit'||t.metodo==='benefit').forEach(t=>addCartao(t.card_id,t.valor));
-  direto.forEach(t=>addCartao(t.card_id,t.valor));
-
-  const cartoes=Object.entries(porCartao)
-    .map(([id,val])=>({card:cardOf(id),val}))
-    .filter(x=>x.card&&x.val>0.005)
-    .sort((a,b)=>b.val-a.val);
-  const total=debito+cartoes.reduce((s,x)=>s+x.val,0);
-
-  const linha=(cor,nome,val,tag)=>`
-    <div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">
-      <span style="width:10px;height:10px;border-radius:3px;background:${cor};flex-shrink:0;"></span>
-      <span style="flex:1;">${nome}${tag?` <span class="tag tag-paid" style="font-size:9px;margin-left:4px;">${tag}</span>`:''}</span>
-      <b style="white-space:nowrap;">${fmt(val)}</b>
-    </div>`;
-
-  document.getElementById('mGastosTitle').textContent=`${c.name} — ${monthLabel(mk)}`;
-  document.getElementById('mGastosBody').innerHTML=
-    (total<0.005
-      ? '<div style="color:var(--text-3);font-size:12px;">Nenhum gasto nesta categoria neste mes.</div>'
-      : (debito>0.005?linha('var(--green)','Pix / Debito',debito):'')
-        +cartoes.map(x=>linha(x.card.color,escHtml(x.card.name),x.val,cardTipo(x.card)==='benefit'?'Beneficio':'Credito')).join('')
-        +`<div style="display:flex;justify-content:space-between;gap:10px;padding:11px 0 2px;font-size:13px;">
-            <b>Total em ${escHtml(c.name)}</b>
-            <b style="white-space:nowrap;">${fmt(total)}</b>
-          </div>`
-        +(c.limit>0?`<div style="font-size:10.5px;color:var(--text-3);margin-top:4px;">Limite do casal: ${fmt(c.limit)} — usado ${((total/c.limit)*100).toFixed(0)}%.</div>`:''));
+function openCatDetail(catId, sub){
+  S.catDetail={catId, sub:sub||'__all'};
+  renderCatDetail();
   openM('modalGastos');
 }
 
+function renderCatDetail(){
+  const {catId, sub}=S.catDetail||{};
+  const c=S.cats.find(x=>x.id===catId); if(!c)return;
+  const mk=S.dashMk||monthKey();
+  const cardOf=id=>S.cards.find(x=>x.id===id);
+
+  /* itens da categoria no mes: gastos (aba Gastos, sem fatura) + compras diretas na aba Cartoes */
+  const gastos=S.tx.filter(t=>inMonth(t.data,mk)&&t.cat_id===catId&&!isFaturaTx(t))
+    .map(t=>({desc:t.descricao, val:Number(t.valor), data:t.data, sub:t.sub||'',
+              metodo:t.metodo, card_id:t.card_id}));
+  const diretos=S.cardTx.filter(t=>inMonth(t.data,mk)&&!t.tx_id&&t.cat_id===catId)
+    .map(t=>({desc:t.descricao, val:Number(t.valor), data:t.data, sub:t.sub||'',
+              metodo:cardTipo(cardOf(t.card_id))==='benefit'?'benefit':'credit', card_id:t.card_id}));
+  let itens=[...gastos,...diretos];
+
+  /* subcategorias presentes, para o filtro */
+  const subsPresentes=[...new Set(itens.map(i=>i.sub).filter(Boolean))].sort();
+  const subSel = (sub && sub!=='__all' && subsPresentes.includes(sub)) ? sub : '__all';
+  if(subSel!=='__all') itens=itens.filter(i=>i.sub===subSel);
+
+  /* agrupa por forma de pagamento: Pix/Debito e cada cartao */
+  const grupos=[];
+  const pix=itens.filter(i=>i.metodo!=='credit'&&i.metodo!=='benefit');
+  if(pix.length) grupos.push({key:'pix', nome:'Pix / Debito', cor:'var(--green)', tag:'', itens:pix});
+  const porCartao={};
+  itens.filter(i=>i.metodo==='credit'||i.metodo==='benefit').forEach(i=>{
+    if(!i.card_id)return;
+    (porCartao[i.card_id]=porCartao[i.card_id]||[]).push(i);
+  });
+  Object.entries(porCartao).forEach(([cid,arr])=>{
+    const card=cardOf(cid); if(!card)return;
+    grupos.push({key:cid, nome:card.name, cor:card.color, tag:cardTipo(card)==='benefit'?'Beneficio':'Credito', itens:arr});
+  });
+  grupos.forEach(g=>{ g.total=g.itens.reduce((s,i)=>s+i.val,0); g.itens.sort((a,b)=>String(b.data).localeCompare(String(a.data))); });
+  grupos.sort((a,b)=>b.total-a.total);
+  const total=grupos.reduce((s,g)=>s+g.total,0);
+
+  const grupoHtml=g=>`
+    <div style="margin-top:14px;">
+      <div style="display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:700;margin-bottom:2px;">
+        <span style="width:10px;height:10px;border-radius:3px;background:${g.cor};flex-shrink:0;"></span>
+        <span style="flex:1;">${escHtml(g.nome)}${g.tag?` <span class="tag tag-paid" style="font-size:9px;margin-left:4px;">${g.tag}</span>`:''}</span>
+        <b style="white-space:nowrap;">${fmt(g.total)}</b>
+      </div>
+      ${g.itens.map(i=>`
+        <div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0 5px 19px;font-size:12px;border-bottom:1px solid var(--border);">
+          <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(i.desc)}<span style="color:var(--text-3);"> · ${fmtDate(i.data)}${i.sub?' · '+escHtml(i.sub):''}</span></span>
+          <span style="white-space:nowrap;color:var(--text-2);">${fmt(i.val)}</span>
+        </div>`).join('')}
+    </div>`;
+
+  const filtro = subsPresentes.length>0 ? `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+      <button class="subtab ${subSel==='__all'?'active':''}" style="padding:5px 12px;font-size:11.5px;" onclick="openCatDetail('${catId}','__all')">Todas</button>
+      ${subsPresentes.map(s=>`<button class="subtab ${subSel===s?'active':''}" style="padding:5px 12px;font-size:11.5px;" onclick="openCatDetail('${catId}','${s.replace(/'/g,"\\'")}')">${escHtml(s)}</button>`).join('')}
+    </div>` : '';
+
+  document.getElementById('mGastosTitle').textContent=`${c.name} — ${monthLabel(mk)}`;
+  document.getElementById('mGastosBody').innerHTML =
+    filtro
+    +(total<0.005
+      ? '<div style="color:var(--text-3);font-size:12px;padding-top:8px;">Nenhum gasto'+(subSel!=='__all'?' nesta subcategoria':' nesta categoria neste mes')+'.</div>'
+      : grupos.map(grupoHtml).join('')
+        +`<div style="display:flex;justify-content:space-between;gap:10px;padding:12px 0 2px;font-size:13px;border-top:2px solid var(--border);margin-top:12px;">
+            <b>Total${subSel!=='__all'?' ('+escHtml(subSel)+')':' em '+escHtml(c.name)}</b>
+            <b style="white-space:nowrap;">${fmt(total)}</b>
+          </div>`
+        +(c.limit>0&&subSel==='__all'?`<div style="font-size:10.5px;color:var(--text-3);margin-top:4px;">Limite do casal: ${fmt(c.limit)} — usado ${((total/c.limit)*100).toFixed(0)}%.</div>`:''));
+}
+
+/* Pagamento de fatura so e escondido dos limites quando NAO tem categoria.
+   Se o usuario atribuir uma categoria (ex: "Faturas cartoes"), ele conta
+   normalmente naquela categoria, permitindo ver o total pago por mes. */
 function isFaturaTx(t){
-  return t.metodo!=='credit' && t.metodo!=='benefit' && !t.card_id && String(t.descricao||'').startsWith('Fatura ');
+  return t.metodo!=='credit' && t.metodo!=='benefit' && !t.card_id
+    && !t.cat_id && String(t.descricao||'').startsWith('Fatura ');
 }
 
 function renderDash(){
@@ -2189,6 +2224,7 @@ async function saveTx(){
   const desc=document.getElementById('mTxDesc').value.trim();
   const val=parseFloat(document.getElementById('mTxAmt').value)||0;
   if(!desc||!val){toast('Preencha descricao e valor','err');return;}
+  if(!document.getElementById('mTxCat').value){toast('Escolha uma categoria para o gasto','err');return;}
   const metodo=document.getElementById('mTxMetodo').value;
   let card_id=null;
   if(metodo==='credit'||metodo==='benefit'){
@@ -2532,6 +2568,7 @@ async function saveCcTx(){
   const desc=document.getElementById('mCcTxDesc').value.trim();
   const val=parseFloat(document.getElementById('mCcTxAmt').value)||0;
   if(!desc||!val){toast('Preencha descricao e valor','err');return;}
+  if(!document.getElementById('mCcTxCat').value){toast('Escolha uma categoria para a compra','err');return;}
   try{
     await sb('card_transactions',{method:'POST',body:JSON.stringify({
       card_id:document.getElementById('mCcTxCardId').value,
@@ -2705,30 +2742,38 @@ async function processRecurrings(){
   if(recProcessed || !S.online || !sbReady()) return;
   const mk=monthKey();
   const hoje=new Date();
+  /* lanca no dia da cobranca (ou depois, se o app so abriu dias depois) */
   const due=S.recs.filter(r=>r.ativo && r.ultimo_mes!==mk && hoje.getDate()>=Number(r.dia));
-  recProcessed=true;
-  if(due.length===0) return;
-  try{
-    let lancados=0;
-    for(const r of due){
+  if(due.length===0){ recProcessed=true; return; }
+  let lancados=0, houveErro=false;
+  for(const r of due){
+    try{
       const dim=new Date(hoje.getFullYear(),hoje.getMonth()+1,0).getDate();
       const dataStr=`${mk}-${String(Math.min(Number(r.dia),dim)).padStart(2,'0')}`;
-      const dup=S.tx.some(t=>t.data===dataStr && t.descricao===r.descricao && Number(t.valor)===Number(r.valor));
-      if(!dup){
+      /* duplicata: verifica gastos (pix) E compras de cartao (credito/beneficio) do mes */
+      const jaTem = S.tx.some(t=>inMonth(t.data,mk) && t.descricao===r.descricao && Number(t.valor)===Number(r.valor))
+        || S.cardTx.some(t=>inMonth(t.data,mk) && t.descricao===r.descricao && Number(t.valor)===Number(r.valor));
+      if(!jaTem){
         const res=await sb('transactions',{method:'POST',body:JSON.stringify({
           descricao:r.descricao, valor:r.valor, cat_id:r.cat_id, sub:r.sub||'',
           pessoa:r.pessoa, tipo:'fixed', metodo:r.metodo||'pix', card_id:r.card_id||null, parcelas:1, data:dataStr
         })});
-        if((r.metodo==='credit') && r.card_id && res && res[0]) await syncCardMirror(res[0]);
+        if((r.metodo==='credit'||r.metodo==='benefit') && r.card_id && res && res[0]) await syncCardMirror(res[0]);
         lancados++;
       }
+      /* so marca como lancado se a transacao acima foi gravada com sucesso */
       await sb(`recurrings?id=eq.${r.id}`,{method:'PATCH',body:JSON.stringify({ultimo_mes:mk})});
+    }catch(e){
+      console.error('recorrente falhou:', r.descricao, e);
+      houveErro=true; /* nao marca ultimo_mes: tenta de novo na proxima abertura */
     }
-    if(lancados>0){
-      toast(`${lancados} gasto${lancados>1?'s':''} recorrente${lancados>1?'s':''} lancado${lancados>1?'s':''} automaticamente`,'ok');
-      await loadAll(true);
-    }
-  }catch(e){ console.error(e); }
+  }
+  recProcessed=true;
+  if(lancados>0){
+    toast(`${lancados} gasto${lancados>1?'s':''} recorrente${lancados>1?'s':''} lancado${lancados>1?'s':''} automaticamente`,'ok');
+    await loadAll(true);
+  }
+  if(houveErro && !lancados) recProcessed=false; /* permite nova tentativa nesta sessao */
 }
 
 /* ============================================================
