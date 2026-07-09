@@ -2650,7 +2650,7 @@ async function payInvoice(cardId, ym){
   try{
     const invCat=await getOrCreateInvoiceCat();
     const resTx=await sb('transactions',{method:'POST',body:JSON.stringify({
-      descricao:`Fatura ${card.name} (venc. ${fmtDate(dueDateIso(card,ym))})`,
+      descricao:`Fatura ${card.name}`,
       valor:val,
       cat_id:invCat.id,
       sub:'',
