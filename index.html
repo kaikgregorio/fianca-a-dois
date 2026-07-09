@@ -1822,7 +1822,7 @@ function renderCatDetail(){
   const cardOf=id=>S.cards.find(x=>x.id===id);
 
   /* itens da categoria no mes: gastos (aba Gastos, sem fatura) + compras diretas na aba Cartoes */
-  const gastos=S.tx.filter(t=>inMonth(t.data,mk)&&t.cat_id===catId&&!isInvoicePaymentTx(t))
+  const gastos=S.tx.filter(t=>inMonth(t.data,mk)&&t.cat_id===catId&&!isFaturaTx(t))
     .map(t=>({desc:t.descricao, val:Number(t.valor), data:t.data, sub:t.sub||'',
               metodo:t.metodo, card_id:t.card_id}));
   const diretos=S.cardTx.filter(t=>inMonth(t.data,mk)&&!t.tx_id&&t.cat_id===catId)
@@ -1928,7 +1928,7 @@ function renderDash(){
     <div class="stat-card"><div class="stat-label">Lancamentos</div><div class="stat-val">${mTx.length}</div><div class="stat-note">registros em ${lbl}</div></div>`;
 
   /* limites: pagamentos de fatura ficam de fora; compras de cartao com categoria entram */
-  const mTxCat=mTx.filter(t=>!isInvoicePaymentTx(t));
+  const mTxCat=mTx.filter(t=>!isFaturaTx(t));
   const mCardDireto=S.cardTx.filter(t=>inMonth(t.data,mk)&&!t.tx_id); /* registradas direto na aba Cartoes */
   const catSpent=cid=>
     mTxCat.filter(t=>t.cat_id===cid).reduce((s,t)=>s+Number(t.valor),0)
