@@ -1421,7 +1421,7 @@ async function loadAll(silent=false){
       sb('fin_messages?select=*&order=ordem.asc&limit=300'),
       sb('invoice_adjustments?select=*')
     ]);
-    S.cats = (cats||[]).map(c=>({...c, subs:Array.isArray(c.subs)?c.subs:[], limit:Number(c.limit_value)||0}));
+    S.cats = (cats||[]).map(c=>({...c, subs:Array.isArray(c.subs)?c.subs:[], limit:Number(c.limit_value)||0, isInvoice:!!c.is_invoice}));
     S.tx = tx||[];
     S.rev = rev||[];
     S.cards = cards||[];
@@ -1587,7 +1587,7 @@ Formato de resposta:
 
 function showConfirmModal(p){
   const cat=catById(p.catId);
-  const catOpts = S.cats.map(c=>`<option value="${c.id}" ${c.id===p.catId?'selected':''}>${escHtml(c.name)}</option>`).join('');
+  const catOpts = S.cats.filter(c=>!c.isInvoice).map(c=>`<option value="${c.id}" ${c.id===p.catId?'selected':''}>${escHtml(c.name)}</option>`).join('');
   const subOpts = (cat.subs||[]).map(s=>`<option value="${escHtml(s)}" ${s===p.sub?'selected':''}>${escHtml(s)}</option>`).join('')||'<option value="">Nenhuma</option>';
   const pOpts = [0,1].map(i=>`<option value="${i}" ${p.pessoa===String(i)?'selected':''}>${escHtml(pn(i))}</option>`).join('')
               + `<option value="both" ${p.pessoa==='both'?'selected':''}>Ambos</option>`;
@@ -1783,8 +1783,8 @@ function openGastosDetail(){
   const mk=S.dashMk||monthKey();
   const mTx=S.tx.filter(t=>inMonth(t.data,mk));
   const cardOf=id=>S.cards.find(x=>x.id===id);
-  const pixDireto=mTx.filter(t=>t.metodo!=='credit'&&t.metodo!=='benefit'&&!isFaturaTx(t)).reduce((s,t)=>s+Number(t.valor),0);
-  const faturas=mTx.filter(t=>isFaturaTx(t)).reduce((s,t)=>s+Number(t.valor),0);
+  const pixDireto=mTx.filter(t=>t.metodo!=='credit'&&t.metodo!=='benefit'&&!isInvoicePaymentTx(t)).reduce((s,t)=>s+Number(t.valor),0);
+  const faturas=mTx.filter(t=>isInvoicePaymentTx(t)).reduce((s,t)=>s+Number(t.valor),0);
   const credito=S.cardTx.filter(t=>inMonth(t.data,mk)&&cardTipo(cardOf(t.card_id))==='credit').reduce((s,t)=>s+Number(t.valor),0);
   const beneficio=S.cardTx.filter(t=>inMonth(t.data,mk)&&cardTipo(cardOf(t.card_id))==='benefit').reduce((s,t)=>s+Number(t.valor),0);
   const saiu=pixDireto+faturas;
@@ -1822,7 +1822,7 @@ function renderCatDetail(){
   const cardOf=id=>S.cards.find(x=>x.id===id);
 
   /* itens da categoria no mes: gastos (aba Gastos, sem fatura) + compras diretas na aba Cartoes */
-  const gastos=S.tx.filter(t=>inMonth(t.data,mk)&&t.cat_id===catId&&!isFaturaTx(t))
+  const gastos=S.tx.filter(t=>inMonth(t.data,mk)&&t.cat_id===catId&&!isInvoicePaymentTx(t))
     .map(t=>({desc:t.descricao, val:Number(t.valor), data:t.data, sub:t.sub||'',
               metodo:t.metodo, card_id:t.card_id}));
   const diretos=S.cardTx.filter(t=>inMonth(t.data,mk)&&!t.tx_id&&t.cat_id===catId)
@@ -1885,10 +1885,16 @@ function renderCatDetail(){
         +(c.limit>0&&subSel==='__all'?`<div style="font-size:10.5px;color:var(--text-3);margin-top:4px;">Limite do casal: ${fmt(c.limit)} — usado ${((total/c.limit)*100).toFixed(0)}%.</div>`:''));
 }
 
-/* Pagamento de fatura so e escondido dos limites quando NAO tem categoria.
-   Se o usuario atribuir uma categoria (ex: "Faturas cartoes"), ele conta
-   normalmente naquela categoria, permitindo ver o total pago por mes. */
+/* Pagamento de fatura so conta nos limites quando esta na categoria
+   especial "Faturas cartoes" (atribuida automaticamente pelo app ao
+   marcar como paga). Qualquer outro gasto, mesmo comecando com "Fatura ",
+   nunca e tratado como pagamento de fatura. */
+function isInvoicePaymentTx(t){
+  const cat=S.cats.find(c=>c.id===t.cat_id);
+  return !!(cat && cat.isInvoice);
+}
 function isFaturaTx(t){
+  /* usado para excluir pagamentos de fatura sem categoria (dados antigos) dos limites */
   return t.metodo!=='credit' && t.metodo!=='benefit' && !t.card_id
     && !t.cat_id && String(t.descricao||'').startsWith('Fatura ');
 }
@@ -1922,7 +1928,7 @@ function renderDash(){
     <div class="stat-card"><div class="stat-label">Lancamentos</div><div class="stat-val">${mTx.length}</div><div class="stat-note">registros em ${lbl}</div></div>`;
 
   /* limites: pagamentos de fatura ficam de fora; compras de cartao com categoria entram */
-  const mTxCat=mTx.filter(t=>!isFaturaTx(t));
+  const mTxCat=mTx.filter(t=>!isInvoicePaymentTx(t));
   const mCardDireto=S.cardTx.filter(t=>inMonth(t.data,mk)&&!t.tx_id); /* registradas direto na aba Cartoes */
   const catSpent=cid=>
     mTxCat.filter(t=>t.cat_id===cid).reduce((s,t)=>s+Number(t.valor),0)
@@ -1933,13 +1939,12 @@ function renderDash(){
     if(c.limit>0){
       const pct=Math.min(100,(spent/c.limit)*100);
       const realPct=((spent/c.limit)*100).toFixed(0);
-      const col=pct>=100?'var(--red)':pct>=80?'var(--amber)':c.color;
       return `<div style="margin-bottom:11px;cursor:pointer;" onclick="openCatDetail('${c.id}')">
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;gap:8px;">
           <span style="font-weight:500;">${escHtml(c.name)}</span>
           <span style="color:var(--text-2);white-space:nowrap;">${fmt(spent)} / ${fmt(c.limit)} — ${realPct}% <span style="color:var(--text-3);">&#8250;</span></span>
         </div>
-        <div class="prog-track"><div class="prog-fill" style="width:${pct.toFixed(0)}%;background:${col};"></div></div>
+        <div class="prog-track"><div class="prog-fill" style="width:${pct.toFixed(0)}%;background:${c.color};"></div></div>
       </div>`;
     }
     return `<div style="margin-bottom:11px;cursor:pointer;" onclick="openCatDetail('${c.id}')">
@@ -2118,6 +2123,8 @@ function toggleObs(id){
 
 async function delTx(id){
   if(!canWrite()) return;
+  const t=S.tx.find(x=>x.id===id);
+  if(t && isInvoicePaymentTx(t)){ toast('Este e um pagamento de fatura. Use "Desfazer" na aba Cartoes para remove-lo.','err'); return; }
   if(!confirm('Remover este gasto?'))return;
   try{
     await sb(`transactions?id=eq.${id}`,{method:'DELETE'});
@@ -2186,6 +2193,7 @@ function toggleParcelas(selId, wrapId){
 
 function openTxModal(id){
   const t = id ? S.tx.find(x=>x.id===id) : null;
+  if(t && isInvoicePaymentTx(t)){ toast('Este e um pagamento de fatura. Use "Desfazer" na aba Cartoes para altera-lo.','err'); return; }
   populateCatSelect('mTxCat');
   populatePersonSelect('mTxPerson');
   document.getElementById('mTxTitle').textContent = t ? 'Editar gasto' : 'Adicionar gasto';
@@ -2380,7 +2388,10 @@ function renderCards(){
                 <div class="cc-inv-val">${fmt(closedVal)}${temAdj?' <span style="font-size:10px;font-weight:500;color:var(--text-3);">(valor ajustado)</span>':''}</div>
               </div>
               ${closedPaid
-                ?'<span class="tag tag-paid">Paga</span>'
+                ?`<div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+                    <span class="tag tag-paid">Paga</span>
+                    <button class="btn btn-secondary btn-sm" onclick="unpayInvoice('${c.id}',${ymClosed})" title="Desfazer pagamento">Desfazer</button>
+                  </div>`
                 :`<div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
                     <button class="btn btn-secondary btn-sm" onclick="openInvEditModal('${c.id}',${ymClosed})" title="Editar valor da fatura" aria-label="Editar valor da fatura">&#9998;</button>
                     ${closedVal>0.005?`<button class="btn btn-primary btn-sm" onclick="payInvoice('${c.id}',${ymClosed})">Marcar como paga</button>`:''}
@@ -2635,22 +2646,36 @@ async function payInvoice(cardId, ym){
   if(!canWrite()) return;
   const card=S.cards.find(c=>c.id===cardId); if(!card) return;
   const val=invoiceValue(card, ym);
-  if(!confirm(`Marcar a fatura de ${fmt(val)} como paga? O valor sera lancado como gasto e deduzido do saldo do mes.`))return;
+  if(!confirm(`Marcar a fatura de ${fmt(val)} como paga? O valor sera lancado em "Faturas cartoes" e deduzido do saldo do mes.`))return;
   try{
-    const catFix=S.cats.find(c=>c.name.toLowerCase()==='contas fixas');
-    await sb('card_payments',{method:'POST',body:JSON.stringify({card_id:cardId, mes:ymKey(ym)})});
-    await sb('transactions',{method:'POST',body:JSON.stringify({
+    const invCat=await getOrCreateInvoiceCat();
+    const resTx=await sb('transactions',{method:'POST',body:JSON.stringify({
       descricao:`Fatura ${card.name} (venc. ${fmtDate(dueDateIso(card,ym))})`,
       valor:val,
-      cat_id:catFix?catFix.id:null,
+      cat_id:invCat.id,
       sub:'',
       pessoa:'both',
       tipo:'fixed',
       data:today()
     })});
+    const txId=resTx && resTx[0] && resTx[0].id;
+    await sb('card_payments',{method:'POST',body:JSON.stringify({card_id:cardId, mes:ymKey(ym), tx_id:txId||null})});
     toast('Fatura paga! Valor deduzido do saldo do mes.','ok');
     await loadAll(true);
   }catch(e){ console.error(e); toast('Erro ao gravar. Tente novamente.','err'); }
+}
+
+async function unpayInvoice(cardId, ym){
+  if(!canWrite()) return;
+  const pay=S.cardPay.find(p=>p.card_id===cardId && p.mes===ymKey(ym));
+  if(!pay){ toast('Pagamento nao encontrado.','err'); return; }
+  if(!confirm('Desfazer o pagamento desta fatura? O gasto lancado sera removido e o valor volta a compor a fatura como nao paga.'))return;
+  try{
+    if(pay.tx_id) await sb(`transactions?id=eq.${pay.tx_id}`,{method:'DELETE'});
+    await sb(`card_payments?id=eq.${pay.id}`,{method:'DELETE'});
+    toast('Pagamento desfeito.','ok');
+    await loadAll(true);
+  }catch(e){ console.error(e); toast('Erro ao desfazer. Tente novamente.','err'); }
 }
 
 /* ============================================================
@@ -3977,7 +4002,21 @@ function exportData(){
    ============================================================ */
 function populateCatSelect(selId){
   const el=document.getElementById(selId); if(!el)return;
-  el.innerHTML=S.cats.map(c=>`<option value="${c.id}">${escHtml(c.name)}</option>`).join('');
+  el.innerHTML=S.cats.filter(c=>!c.isInvoice).map(c=>`<option value="${c.id}">${escHtml(c.name)}</option>`).join('');
+}
+
+/* categoria especial e automatica: so o "Marcar como paga" a atribui.
+   Se ainda nao existir, cria na primeira vez que uma fatura for paga. */
+async function getOrCreateInvoiceCat(){
+  let cat=S.cats.find(c=>c.isInvoice);
+  if(cat) return cat;
+  const ordem=S.cats.length ? Math.max(...S.cats.map(c=>c.ordem||0))+1 : 0;
+  const r=await sb('categories',{method:'POST',body:JSON.stringify({
+    name:'Faturas cartoes', color:'#EF4444', limit_value:0, subs:[], ordem, is_invoice:true
+  })});
+  cat={...r[0], subs:[], limit:0, isInvoice:true};
+  S.cats.push(cat);
+  return cat;
 }
 function updateSubs(subId,catId){
   const catEl=document.getElementById(catId), subEl=document.getElementById(subId);
